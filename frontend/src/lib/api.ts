@@ -1,4 +1,4 @@
-import { AuthResponse, City, Event, RefreshResponse, User } from "@/lib/types";
+import { AuthResponse, City, Event, RefreshResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -73,6 +73,35 @@ export const ApiClient = {
     const res = await apiFetch(`/dashboard/cities/${cityId}/events`);
     if (!res.ok) throw new Error("Erro ao carregar eventos.");
     return res.json();
+  },
+
+  async uploadMedia(
+    eventId: number,
+    files: File[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<UploadResponse> {
+    const BATCH = 10;
+    const allResults: UploadResponse["results"] = [];
+    let done = 0;
+
+    for (let i = 0; i < files.length; i += BATCH) {
+      const batch = files.slice(i, i + BATCH);
+      const form = new FormData();
+      form.append("event_id", String(eventId));
+      batch.forEach((f) => form.append("files", f));
+
+      const res = await apiFetch("/media/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail ?? "Falha no upload.");
+      }
+      const data: UploadResponse = await res.json();
+      allResults.push(...data.results);
+      done += batch.length;
+      onProgress?.(done, files.length);
+    }
+
+    return { results: allResults };
   },
 
   fetch: apiFetch,

@@ -36,3 +36,14 @@ export interface Event {
   status: string;
   city_name: string;
 }
+
+export interface UploadResultItem {
+  filename: string;
+  success: boolean;
+  media_id: number | null;
+  error: string | null;
+}
+
+export interface UploadResponse {
+  results: UploadResultItem[];
+}
