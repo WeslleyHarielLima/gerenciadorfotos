@@ -25,6 +25,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# ── 0. Libera portas ocupadas ──────────────────────────────────
+for PORT in 8000 3000; do
+  PIDS=$(lsof -ti:"$PORT" 2>/dev/null || true)
+  if [ -n "$PIDS" ]; then
+    warn "Porta $PORT em uso — encerrando processo(s): $PIDS"
+    kill $PIDS 2>/dev/null || true
+    sleep 1
+  fi
+done
+
 # ── 1. Docker Postgres ─────────────────────────────────────────
 log "Subindo Postgres (Docker)..."
 docker compose -f "$ROOT/docker-compose.yml" up -d
