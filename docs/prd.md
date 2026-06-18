@@ -137,13 +137,15 @@ DB_VOLUME=workflow_postgres_data
 GSM_SECRET_NAME=workflow-postgres-password
 
 # ─── Google APIs ──────────────────────────────────
+GCP_PROJECT_ID=weighty-skyline-499813-b5
 GOOGLE_CALENDAR_ID=seu-calendar-id
 GOOGLE_DRIVE_ROOT_FOLDER_ID=id-da-pasta-raiz
 
-# ─── Múltiplas agendas por cidade ─────────────────
-GOOGLE_SERVICE_KEY_PORTO_VELHO=nome-do-segredo-gsm
-GOOGLE_SERVICE_KEY_JI_PARANA=nome-do-segredo-gsm
-GOOGLE_SERVICE_KEY_ARIQUEMES=nome-do-segredo-gsm
+# ─── Service Account (única para Drive + Calendar) ─
+# E-mail é identificador (pode versionar); a chave privada JSON fica no GSM —
+# aqui só o NOME do segredo, nunca o JSON em si.
+GOOGLE_SERVICE_ACCOUNT_EMAIL=intakegoogle@weighty-skyline-499813-b5.iam.gserviceaccount.com
+GOOGLE_SERVICE_ACCOUNT_SECRET=workflow-intakegoogle-key
 
 # ─── JWT ──────────────────────────────────────────
 JWT_SECRET_NAME=workflow-jwt-secret
@@ -178,7 +180,7 @@ created_at
 id
 city_id                   FK cities
 google_calendar_event_id  ID do evento no Calendar
-google_calendar_key       qual chave de serviço usou (por cidade)
+google_calendar_key       service account usada (MVP: única — intakegoogle; campo mantido p/ multi-conta futuro)
 google_drive_folder_id    ID da pasta do evento no Drive
 name                      título vindo do Calendar
 description               descrição vinda do Calendar

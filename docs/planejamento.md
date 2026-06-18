@@ -400,10 +400,13 @@ Criar cidade+evento no admin → aparecer no dashboard → navegar até o evento
 ## TAREFA 3.1 — Configurar Google Drive (pré-requisito externo)
 
 **Antes do código**, garantir que existe:
-- Projeto GCP com Drive API v3 habilitada
-- Service Account com credentials.json
-- Pasta raiz no Drive compartilhada com a service account
-- Variável GOOGLE_SERVICE_ACCOUNT_JSON e GOOGLE_DRIVE_ROOT_FOLDER_ID no .env
+- Projeto GCP `weighty-skyline-499813-b5` com Drive API v3 habilitada
+- Service Account **`intakegoogle@weighty-skyline-499813-b5.iam.gserviceaccount.com`** (status: Ativado), key ID em uso `5927c09d22802f3fb3ff78519f1e5bce44c40ca0`
+- Pasta raiz no Drive **compartilhada com essa service account** (e-mail acima como Editor)
+- `GOOGLE_DRIVE_ROOT_FOLDER_ID` no `.env`
+- **Chave privada (JSON)** da service account no **Google Secret Manager** — o `.env` guarda só o *nome* do segredo (ex.: `GOOGLE_SERVICE_ACCOUNT_SECRET=workflow-intakegoogle-key`), nunca o JSON em si
+
+> ⚠️ O JSON da chave privada e o arquivo `docs/google.md` nunca vão para o repositório (ver `.gitignore`). Em dev local, o JSON fica fora do repo; em produção, só no GSM.
 
 **Testar:**
 ```bash
@@ -770,7 +773,7 @@ Verificar: só original + versão aprovada sobram no banco; arquivo em 05_publis
 
 ## TAREFA 7.2 — Configurar Google Calendar (pré-requisito externo)
 
-**Garantir:** Calendar API habilitada, service account com acesso ao calendário, GOOGLE_CALENDAR_ID no .env.
+**Garantir:** Calendar API habilitada no projeto `weighty-skyline-499813-b5`, a service account `intakegoogle@weighty-skyline-499813-b5.iam.gserviceaccount.com` com acesso de leitura ao calendário (compartilhar o calendário com esse e-mail), `GOOGLE_CALENDAR_ID` no `.env`. Reutiliza a mesma chave privada do Drive, guardada no GSM.
 
 **Testar:**
 ```bash

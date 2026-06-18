@@ -1,0 +1,26 @@
+# ─── Segredos / credenciais (NUNCA versionar) ───────────────
+.env
+.env.*
+!.env.example
+*credentials*.json
+*service-account*.json
+*.key
+*.pem
+# dump do console GCP — pode conter chave privada
+docs/google.md
+
+# ─── Python ─────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ─── Node / Next.js ─────────────────────────────────────────
+node_modules/
+.next/
+out/
+
+# ─── SO / editor ────────────────────────────────────────────
+.DS_Store
+*.log
