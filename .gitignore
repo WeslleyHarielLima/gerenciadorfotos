@@ -4,6 +4,9 @@
 !.env.example
 *credentials*.json
 *service-account*.json
+# chave privada da service account GCP (qualquer nome de projeto)
+weighty-skyline-*.json
+docs/weighty-skyline-*.json
 *.key
 *.pem
 # dump do console GCP — pode conter chave privada

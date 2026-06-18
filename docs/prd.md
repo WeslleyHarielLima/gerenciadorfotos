@@ -138,8 +138,8 @@ GSM_SECRET_NAME=workflow-postgres-password
 
 # ─── Google APIs ──────────────────────────────────
 GCP_PROJECT_ID=weighty-skyline-499813-b5
-GOOGLE_CALENDAR_ID=seu-calendar-id
-GOOGLE_DRIVE_ROOT_FOLDER_ID=id-da-pasta-raiz
+GOOGLE_CALENDAR_ID=consultoria.weslleypalomeque@gmail.com
+GOOGLE_DRIVE_ROOT_FOLDER_ID=1JvKmD1_QEnLTR43NiakFoDFvIPzsOB0z
 
 # ─── Service Account (única para Drive + Calendar) ─
 # E-mail é identificador (pode versionar); a chave privada JSON fica no GSM —
