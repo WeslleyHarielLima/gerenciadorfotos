@@ -18,7 +18,7 @@ Estes princípios não podem ser violados por nenhuma implementação, independe
 3. **Versões editadas nunca sobrescrevem o original** — sempre criam uma nova linha em `media_versions`.
 4. **Anti-fraude por hash** — o hash SHA-256 da versão editada deve diferir do original; hash igual é rejeitado e registrado como `fraud_attempt`.
 5. **Soft delete** — desistências e remoções marcam (`deleted_at`/`deleted_by`), nunca apagam linhas.
-6. **Frontend nunca acessa o banco direto** — toda leitura/escrita passa pela API (Django Admin ou FastAPI).
+6. **Frontend nunca acessa o banco direto** — toda leitura/escrita passa pela API (Django Admin ou API Django Ninja).
 7. **Segredos nunca em texto plano no repositório** — senha do Postgres e secrets sensíveis vêm do Google Secret Manager; o `.env` do repo só guarda o *nome* do segredo no GSM.
 
 ## 3. Stack Técnica
@@ -26,25 +26,26 @@ Estes princípios não podem ser violados por nenhuma implementação, independe
 | Camada | Tecnologia | Responsabilidade |
 |---|---|---|
 | Frontend | Next.js 14 (TypeScript) + Tailwind CSS | Interface web, kanban, modais |
-| Backend API | FastAPI 0.111.0 (Python) | Upload, fluxo, hash, integração Drive/Calendar |
-| Backend Admin | Django 5.0.4 + django-unfold 0.35.0 | Painel admin, ORM, autenticação, migrations |
+| Backend | Django 5.0.4 + Django Ninja, servido por uvicorn (ASGI) | Admin, ORM, migrations, auth, API REST (upload, fluxo, hash, Drive/Calendar) |
+| Painel Admin | django-unfold 0.35.0 | Tema moderno sobre o Django Admin |
 | Banco | PostgreSQL 16 em Docker (porta 5432) | Metadados, hashes, controle de fluxo |
 | Storage | Google Drive API v3 | Armazenamento de binários |
 | Eventos | Google Calendar API v3 | Fonte dos eventos e metadados |
 | Segredos | Google Secret Manager (GSM) | Senha do Postgres e secrets sensíveis |
-| Proxy | Nginx (VPS) | Roteamento `/admin` → Django, `/api` → FastAPI |
+| Proxy | Nginx (VPS) | Roteamento `/admin` e `/api` → backend Django (uvicorn, porta 8000) |
 
-**Divisão Django/FastAPI:** Django cuida do painel admin (Unfold), ORM/migrations e auth/permissions. FastAPI cuida de endpoints assíncronos de upload/processamento, pipe de ingestão, endpoints do kanban e scripts de sync com Calendar/Drive. Ambos compartilham o mesmo banco via os mesmos models.
+**Backend único:** um só processo Django, em modo ASGI sob **uvicorn**, concentra admin e API. Django cuida do painel admin (Unfold), ORM/migrations e auth/permissions. **Django Ninja** expõe a API REST (schemas Pydantic, views `async def`, OpenAPI automático em `/api/docs`): upload/processamento, pipe de ingestão e endpoints do kanban. Os scripts de sync com Calendar/Drive rodam como processos à parte usando os mesmos models. Não há serviço de API separado — `/admin` e `/api` são o mesmo processo.
 
 ## 4. Estrutura de Pastas
 
 ```
 workflow-studio/
 ├── backend/
-│   ├── django_admin/
-│   ├── fastapi_app/
+│   ├── config/         # projeto Django: settings, asgi.py (ponto de entrada uvicorn), urls
+│   ├── core/           # models, admin (Unfold), migrations
+│   ├── api/            # Django Ninja: NinjaAPI, routers, schemas Pydantic, auth (JWT), deps de role
 │   ├── scripts/        # calendar_sync.py, drive_cleanup.py, backup.py
-│   └── shared/          # secrets.py, drive.py — código compartilhado entre Django e FastAPI
+│   └── shared/         # secrets.py, drive.py — código compartilhado
 ├── frontend/
 ├── nginx/
 ├── docker-compose.yml
@@ -76,7 +77,7 @@ Tabelas principais: `cities`, `events`, `users`, `media`, `media_versions`, `tas
 
 ## 7. Segurança
 
-- O frontend nunca tem credencial de banco; apenas Django e FastAPI acessam o Postgres.
+- O frontend nunca tem credencial de banco; apenas o backend Django (admin + API Ninja) acessa o Postgres.
 - A senha do Postgres vem do GSM com TTL curto; nunca logar o valor do segredo (verificar isso em toda função que manipula secrets).
 - Em desenvolvimento local, segredos ficam em `.env` local **fora do repositório** — o `.env.example` versionado só tem nomes de variáveis e placeholders.
 - VPS protegida por firewall, apenas portas necessárias expostas.
@@ -86,7 +87,7 @@ Tabelas principais: `cities`, `events`, `users`, `media`, `media_versions`, `tas
 ## 8. Pipe de Ingestão (regra de implementação)
 
 ```
-Browser → Next.js → FastAPI (recebe em memória, nunca toca disco)
+Browser → Next.js → API Ninja (recebe em memória, nunca toca disco)
   → calcula SHA-256 → upload para 01_uploaded no Drive
   → salva metadados + hash no Postgres → descarta binário da memória
 ```

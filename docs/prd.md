@@ -44,38 +44,47 @@ Times de produção fotográfica e audiovisual perdem tempo e cometem erros por 
 | Camada | Tecnologia | Responsabilidade |
 |---|---|---|
 | Frontend | Next.js (TypeScript) + Tailwind CSS | Interface web, kanban, modais |
-| Backend API | FastAPI (Python) | Endpoints de upload, fluxo, hash, Drive |
-| Backend Admin | Django (Python) + Unfold | Painel admin, ORM, autenticação, migrations |
+| Backend | Django (Python) + Django Ninja, servido por uvicorn (ASGI) | Admin, ORM, migrations, auth, API REST (upload, fluxo, hash, Drive) |
+| Painel Admin | django-unfold | Tema moderno sobre o Django Admin |
 | Banco | PostgreSQL em container Docker (porta 5432) | Metadados, hashes, controle de fluxo |
 | Storage | Google Drive via API | Armazenamento de binários |
 | Eventos | Google Calendar via API | Fonte dos eventos e metadados |
 | Segredos | Google Secret Manager (GSM) | Senha do Postgres e secrets sensíveis |
-| Proxy | Nginx (VPS) | Roteamento entre Django e FastAPI |
+| Proxy | Nginx (VPS) | Roteamento para o backend Django |
 | Infraestrutura | VPS com firewall | Deploy do backend com acesso seguro via internet |
 
-### Por que Django e FastAPI juntos
+### Por que Django + Django Ninja + uvicorn (backend único)
+
+Um **único** processo Django, rodando em modo ASGI sob **uvicorn**, concentra admin e API. Não há serviço separado para a API.
 
 **Django** cuida de:
 - Painel admin com Unfold — visual moderno, configurável, sem construir do zero
 - ORM completo com migrations gerenciadas
 - Sistema de autenticação e permissões já pronto
-- Models compartilhados com o FastAPI via mesmo banco
+- Models como fonte única — a API consome os mesmos models, sem ponte entre serviços
 
-**FastAPI** cuida de:
-- Endpoints assíncronos de alta performance para upload e processamento
+**Django Ninja** cuida de:
+- Endpoints REST com schemas Pydantic e validação automática
+- Views assíncronas (`async def`) para upload e processamento, servidas por uvicorn
 - Pipe de ingestão: recebe binário → calcula hash → envia ao Drive → salva metadados
 - Endpoints do kanban com respostas rápidas para o Next.js
-- Script de sync com Google Calendar e Google Drive
+- Documentação OpenAPI/Swagger automática em `/api/docs`
+
+Os scripts de sync com Google Calendar e Drive rodam como management commands / processos à parte, usando os mesmos models e o ORM do Django.
+
+> **Nota sobre async e o Drive:** as SDKs `google-api-python-client` são síncronas; chamadas ao Drive/Calendar rodam em threadpool (`sync_to_async`) tanto aqui quanto em qualquer outra stack. O ganho de async está no I/O concorrente da app, não na SDK do Drive.
 
 ### Roteamento via Nginx
 
 ```
 Nginx (VPS)
-  /admin/   → Django  (porta 8000)
-  /api/     → FastAPI (porta 8001)
+  /admin/   → Django (uvicorn, porta 8000)
+  /api/     → Django Ninja (mesmo processo Django, porta 8000)
 
 Frontend Next.js → Vercel
 ```
+
+> `/admin` e `/api` são o **mesmo** processo Django sob uvicorn — o Nginx só separa os caminhos por conveniência (cache, rate limit, body size), não por upstream.
 
 ---
 
@@ -110,7 +119,7 @@ O painel admin expõe:
 ## 7. Arquitetura de Segurança
 
 - O frontend nunca acessa o banco diretamente
-- Apenas o backend (Django e FastAPI) tem credencial do Postgres
+- Apenas o backend Django (admin + API Ninja) tem credencial do Postgres
 - A senha do Postgres fica no Google Secret Manager
 - O backend busca o segredo no GSM com TTL curto, conecta, e o segredo expira do cache
 - O `.env` do repositório contém apenas o nome do segredo no GSM, nunca a senha em si
@@ -142,8 +151,7 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRE_HOURS=168
 
 # ─── Serviços ─────────────────────────────────────
-DJANGO_PORT=8000
-FASTAPI_PORT=8001
+DJANGO_PORT=8000          # admin + API Ninja, mesmo processo (uvicorn ASGI)
 FRONTEND_URL=https://seu-dominio.vercel.app
 ENVIRONMENT=development
 ```
@@ -203,7 +211,7 @@ drive_parent_folder_id    pasta atual no Drive
 original_filename
 mime_type
 file_size
-hash_sha256               calculado pelo FastAPI antes do upload pro Drive
+hash_sha256               calculado pela API antes do upload pro Drive
 uploaded_by               FK users
 status                    uploaded / selected_for_edit / pending_review /
                           approved / published / rejected_final
@@ -355,19 +363,19 @@ Frontend verifica se evento existe no banco
   → Não existe → bloqueia com mensagem "Evento ainda não disponível"
   → Existe → libera dropzone
         ↓
-Next.js envia binário para o FastAPI
+Next.js envia binário para a API (Django Ninja)
         ↓
-FastAPI recebe em memória (nunca toca o disco)
+A API recebe em memória (nunca toca o disco)
         ↓
-FastAPI calcula SHA-256
+A API calcula SHA-256
         ↓
-FastAPI faz upload para pasta 01_uploaded do evento no Drive
+A API faz upload para pasta 01_uploaded do evento no Drive
         ↓
 Drive retorna file_id, links, mimeType, size, createdTime
         ↓
-FastAPI salva metadados + hash no Postgres
+A API salva metadados + hash no Postgres
         ↓
-FastAPI descarta binário da memória
+A API descarta binário da memória
         ↓
 Retorna sucesso para o frontend
 ```
@@ -381,7 +389,7 @@ Retorna sucesso para o frontend
 Quando o editor faz upload da versão editada:
 
 ```
-FastAPI calcula SHA-256 da versão nova
+A API calcula SHA-256 da versão nova
         ↓
 Busca hash do original no banco
         ↓
@@ -405,13 +413,13 @@ Se diferentes → salva versão no Drive
 
 ### Primário — Embed de media_id no EXIF
 
-Quando o editor baixa o ZIP com os originais, o FastAPI injeta o `media_id` do banco nos metadados EXIF de cada arquivo antes de compactar.
+Quando o editor baixa o ZIP com os originais, a API injeta o `media_id` do banco nos metadados EXIF de cada arquivo antes de compactar.
 
 ```
 Download: DSC_0042.jpg
-  → FastAPI injeta EXIF: media_id=847
+  → API injeta EXIF: media_id=847
   → Editor salva como "final_casamento.jpg"
-  → Upload: FastAPI lê EXIF → media_id=847 → vínculo feito
+  → Upload: API lê EXIF → media_id=847 → vínculo feito
 ```
 
 Funciona independente de como o editor renomeia o arquivo. Para vídeos usa metadados de container (MP4).
@@ -438,7 +446,7 @@ O editor vê miniatura do original à direita e arrasta o arquivo enviado para o
 - Editor marca arquivos com checkbox na coluna Disponíveis
 - Clica em "Baixar selecionados"
 - Sistema gera ZIP com os originais selecionados
-- FastAPI injeta EXIF com `media_id` em cada arquivo antes de compactar
+- A API injeta EXIF com `media_id` em cada arquivo antes de compactar
 - Cards criados automaticamente na coluna Editando
 
 ### Upload
@@ -534,7 +542,7 @@ Justificativa (obrigatória para rejeição)
 [ Fechar ]  [ Rejeitar com retorno ]  [ Rejeição total ]  [ Aprovar ]
 ```
 
-- Imagens carregadas via signed URL temporária gerada pelo FastAPI (expiração 15 min)
+- Imagens carregadas via signed URL temporária gerada pela API (expiração 15 min)
 - Histórico completo sempre visível independente de qual curador está revisando
 - Justificativa obrigatória para rejeição com retorno e rejeição total
 - Histórico salvo na tabela `task_history`
@@ -638,7 +646,7 @@ ORDER BY c.name
 ## 22. Publicação no MVP
 
 - Publicador clica em "Publicar" no card aprovado
-- FastAPI move arquivo para pasta `05_published` no Drive
+- A API move arquivo para pasta `05_published` no Drive
 - Card some da fila ativa e vai para aba "Histórico" do evento
 - Status atualizado para `published` no banco
 - Integração com Meta e TikTok no roadmap pós-MVP
@@ -710,19 +718,19 @@ ORDER BY c.name
  1.  Docker Compose com Postgres
  2.  Migrations do banco — Django (todas as tabelas)
  3.  Django + Unfold: autenticação, painel admin, models
- 4.  FastAPI: integração com GSM para senha do banco
+ 4.  Backend: integração com GSM para senha do banco
  5.  Script: sync com Google Calendar + validação de campos + log de execução
  6.  Script: criação de pastas no Google Drive
  7.  Script: backup diário do Postgres para o Drive
- 8.  FastAPI: pipe de ingestão (upload → Drive → Postgres)
- 9.  FastAPI: geração de signed URLs para visualização no modal
-10.  FastAPI: download em lote com ZIP + injeção de EXIF
-11.  FastAPI: upload em lote com matching por EXIF + fallback manual
-12.  FastAPI: endpoints do fluxo por fase
-13.  FastAPI: anti-fraude por hash
-14.  FastAPI: limpeza de versões com pending_drive_deletions
-15.  FastAPI: backoff exponencial nas chamadas ao Drive
-16.  Nginx: roteamento /admin → Django · /api → FastAPI
+ 8.  API (Ninja): pipe de ingestão (upload → Drive → Postgres)
+ 9.  API (Ninja): geração de signed URLs para visualização no modal
+10.  API (Ninja): download em lote com ZIP + injeção de EXIF
+11.  API (Ninja): upload em lote com matching por EXIF + fallback manual
+12.  API (Ninja): endpoints do fluxo por fase
+13.  API (Ninja): anti-fraude por hash
+14.  API (Ninja): limpeza de versões com pending_drive_deletions
+15.  API (Ninja): backoff exponencial nas chamadas ao Drive
+16.  Nginx: roteamento /admin e /api → backend Django (uvicorn)
 17.  Next.js: login + proteção de rotas por role + refresh token silencioso
 18.  Next.js: dashboard com seção "Em andamento" + cascata cidade → evento
 19.  Next.js: kanban do uploader com verificação de evento no banco

@@ -53,8 +53,8 @@ Workflow Studio gerencia o fluxo de edição de fotos e vídeos de um time de pr
 
 **Stack:**
 ```
-Backend Admin:  Django 5.0.4 + django-unfold 0.35.0
-Backend API:    FastAPI 0.111.0
+Backend:        Django 5.0.4 + Django Ninja (API) + django-unfold 0.35.0
+Servidor:       uvicorn (ASGI) — um só processo serve /admin e /api
 Banco:          PostgreSQL 16 (Docker)
 Frontend:       Next.js 14 + TypeScript + Tailwind
 Storage:        Google Drive (API v3)
@@ -89,8 +89,9 @@ uploaded → selected_for_edit → pending_review → approved → published
 ```
 workflow-studio/
 ├── backend/
-│   ├── django_admin/
-│   ├── fastapi_app/
+│   ├── config/        # projeto Django: settings, asgi.py, urls
+│   ├── core/          # models, admin (Unfold), migrations
+│   ├── api/           # Django Ninja: routers, schemas, auth
 │   ├── scripts/
 │   └── shared/
 ├── frontend/
@@ -103,7 +104,7 @@ workflow-studio/
 
 **Testar:**
 ```bash
-test -d backend/django_admin && echo "OK estrutura"
+test -d backend/config && test -d backend/api && echo "OK estrutura"
 git status  # repositório inicializado
 cat .gitignore | grep -q ".env" && echo "OK .env ignorado"
 ```
@@ -130,26 +131,25 @@ docker compose down && docker compose up -d  # persistência sobrevive ao restar
 
 ---
 
-## TAREFA 0.3 — Requirements e ambientes Python
+## TAREFA 0.3 — Requirements e ambiente Python
 
-**Criar** `requirements.txt` para Django e FastAPI com versões fixadas (ver lista na seção Stack).
+**Criar** um único `requirements.txt` em `backend/` com versões fixadas: `django==5.0.4`, `django-unfold==0.35.0`, `django-ninja` (1.x), `uvicorn[standard]`, `pyjwt`, `psycopg[binary]`, `google-api-python-client`, `google-cloud-secret-manager`, `piexif`/`pillow` (EXIF), etc. Um só ambiente — admin e API rodam no mesmo processo Django.
 
 **Testar:**
 ```bash
-cd backend/django_admin && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && echo "OK Django deps"
-cd ../fastapi_app && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && echo "OK FastAPI deps"
+cd backend && python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && echo "OK deps"
+python -c "import ninja, uvicorn, django; print('OK imports')"
 ```
 
-**Concluído quando:** ambos instalam sem conflito de versão.
+**Concluído quando:** instala sem conflito de versão e os imports funcionam.
 
 ---
 
 # FASE 1 — CRUD DE USUÁRIOS + TELA DE LOGIN
 
 > Objetivo: primeiro vertical slice completo. Criar usuário, autenticar, logar na tela.
-> Esta fase prova que banco + Django + FastAPI + Next.js conversam.
+> Esta fase prova que banco + Django + API Ninja + Next.js conversam.
 
 ---
 
@@ -226,19 +226,23 @@ from shared.secrets import get_secret; get_secret('x', 'T')
 
 ---
 
-## TAREFA 1.4 — Autenticação JWT no FastAPI
+## TAREFA 1.4 — Autenticação JWT na API Ninja
 
-**Criar** `fastapi_app/services/auth.py` (verify_django_password, create_access_token, create_refresh_token, verify_token, get_current_user, require_role).
+**Criar** `api/auth.py`:
+- `create_access_token` / `create_refresh_token` / `verify_token` (PyJWT, HS256, expiração de 168h vinda do `.env`).
+- Autenticação de senha usando o **auth nativo do Django** (`django.contrib.auth.authenticate`) — sem reimplementar verificação de hash; o usuário e a senha são os mesmos do admin.
+- `JWTAuth(HttpBearer)` do Django Ninja para proteger rotas e popular `request.auth` com o usuário.
+- `require_role(*roles)` como dependência/decorator que retorna 403 para role incorreta.
 
-**Criar** `fastapi_app/routers/auth.py` com POST /api/auth/login, POST /api/auth/refresh, GET /api/auth/me.
+**Criar** `api/routers/auth.py` (router Ninja) com POST /api/auth/login, POST /api/auth/refresh, GET /api/auth/me. Montar no `NinjaAPI` em `api/__init__.py`, exposto pelo `config/urls.py`.
 
 **Testar:**
 ```bash
-# Criar usuário de teste no Django primeiro
-uvicorn main:app --port 8001 &
+# Criar usuário de teste no Django primeiro (mesmo banco/admin)
+uvicorn config.asgi:application --port 8000 &
 
 # Login válido
-curl -X POST localhost:8001/api/auth/login -H "Content-Type: application/json" \
+curl -X POST localhost:8000/api/auth/login -H "Content-Type: application/json" \
   -d '{"username":"editor_teste","password":"senha123"}'
 # Esperado: access_token, refresh_token, user.role
 
@@ -247,9 +251,10 @@ curl -X POST localhost:8001/api/auth/login -H "Content-Type: application/json" \
 # /me com token → dados do usuário
 # /refresh com refresh_token → novo access_token
 # require_role: editor tentando endpoint de uploader → 403
+# Swagger automático disponível em localhost:8000/api/docs
 ```
 
-**Concluído quando:** todos os cenários de auth retornam o esperado.
+**Concluído quando:** todos os cenários de auth retornam o esperado, usando o auth nativo do Django.
 
 ---
 
@@ -277,7 +282,7 @@ npm run dev &
 npm run type-check  # zero erros de tipo
 ```
 
-**Concluído quando:** login funciona ponta a ponta (tela → FastAPI → banco → redirect).
+**Concluído quando:** login funciona ponta a ponta (tela → API Ninja → banco → redirect).
 
 ---
 
@@ -336,9 +341,9 @@ print('OK: cidade e evento relacionados')
 
 ---
 
-## TAREFA 2.3 — Endpoints de leitura de Cidades/Eventos (FastAPI)
+## TAREFA 2.3 — Endpoints de leitura de Cidades/Eventos (API Ninja)
 
-**Criar** `routers/dashboard.py` com:
+**Criar** `api/routers/dashboard.py` com:
 - GET /api/dashboard/cities (filtrado por role e status)
 - GET /api/dashboard/cities/{city_id}/events
 
@@ -347,9 +352,9 @@ Por enquanto sem mídia (vem na Fase 3) — retornar eventos ativos da cidade.
 **Testar:**
 ```bash
 # Com token de cada role:
-curl localhost:8001/api/dashboard/cities -H "Authorization: Bearer $TOKEN"
+curl localhost:8000/api/dashboard/cities -H "Authorization: Bearer $TOKEN"
 # Esperado: cidades com eventos ativos
-curl localhost:8001/api/dashboard/cities/1/events -H "Authorization: Bearer $TOKEN"
+curl localhost:8000/api/dashboard/cities/1/events -H "Authorization: Bearer $TOKEN"
 # Esperado: eventos da cidade 1
 ```
 
@@ -456,11 +461,11 @@ print('OK: media e version')
 
 ## TAREFA 3.4 — Endpoint de Upload + hash
 
-**Criar** `services/hash.py` (calculate_sha256) e endpoint POST /api/media/upload (role uploader): valida evento existe, valida mime_type, calcula hash, sobe pro Drive, cria Media + MediaVersion original, registra ActivityLog, descarta bytes.
+**Criar** `api/services/hash.py` (calculate_sha256) e endpoint POST /api/media/upload (role uploader): valida evento existe, valida mime_type, calcula hash, sobe pro Drive, cria Media + MediaVersion original, registra ActivityLog, descarta bytes.
 
 **Testar:**
 ```bash
-curl -X POST localhost:8001/api/media/upload -H "Authorization: Bearer $TOKEN_UPLOADER" \
+curl -X POST localhost:8000/api/media/upload -H "Authorization: Bearer $TOKEN_UPLOADER" \
   -F "event_id=1" -F "files=@foto.jpg"
 # Esperado: success com media_id
 
@@ -523,7 +528,7 @@ python manage.py makemigrations core && python manage.py migrate
 
 ## TAREFA 4.2 — Módulo EXIF
 
-**Criar** `services/exif.py` com inject_media_id_exif e extract_media_id_exif (campo UserComment, formato "workflow_media_id:{id}", tolerante a falha).
+**Criar** `api/services/exif.py` com inject_media_id_exif e extract_media_id_exif (campo UserComment, formato "workflow_media_id:{id}", tolerante a falha).
 
 **Testar:**
 ```bash
@@ -546,7 +551,7 @@ print('OK: EXIF round-trip')
 
 **Testar:**
 ```bash
-curl -X POST localhost:8001/api/media/download-batch -H "Authorization: Bearer $TOKEN_EDITOR" \
+curl -X POST localhost:8000/api/media/download-batch -H "Authorization: Bearer $TOKEN_EDITOR" \
   -H "Content-Type: application/json" -d '{"media_ids":[1,2,3]}' --output z.zip
 # ZIP tem 3 arquivos, cada um com EXIF media_id
 # Tasks criadas, status = selected_for_edit
@@ -639,7 +644,7 @@ python manage.py makemigrations core && python manage.py migrate
 
 ## TAREFA 5.2 — Endpoints do Curador
 
-**Criar** em `routers/tasks.py`:
+**Criar** em `api/routers/tasks.py`:
 - GET /api/tasks/review (signed URLs original+editado 15min, histórico completo)
 - POST /api/tasks/{id}/approve (status approved, registra versões intermediárias em PendingDriveDeletion, cria task publisher, TaskHistory)
 - POST /api/tasks/{id}/reject-with-return (feedback obrigatório, volta para selected_for_edit, reabre task editor, TaskHistory)
@@ -880,7 +885,7 @@ Admin vê gargalos e saúde do sistema. Cada usuário vê suas tarefas em andame
 
 ## TAREFA 9.1 — Nginx como Proxy Reverso
 
-**Criar** `nginx/nginx.conf`: /admin→Django, /api→FastAPI, / →frontend, client_max_body_size 500M, rate limiting 100/min, gzip, HTTPS.
+**Criar** `nginx/nginx.conf`: /admin e /api → backend Django (uvicorn, mesmo upstream na porta 8000), / →frontend, client_max_body_size 500M, rate limiting 100/min, gzip, HTTPS.
 
 **Testar:**
 ```bash
@@ -894,13 +899,13 @@ curl localhost/api/health                               # 200
 
 ## TAREFA 9.2 — Docker Compose Completo
 
-**Atualizar** `docker-compose.yml` com todos os serviços (postgres, django, fastapi, nginx, calendar_sync, drive_cleanup, backup) com restart unless-stopped, healthchecks, log rotation.
+**Atualizar** `docker-compose.yml` com todos os serviços (postgres, backend [Django+uvicorn servindo admin+API], nginx, calendar_sync, drive_cleanup, backup) com restart unless-stopped, healthchecks, log rotation.
 
 **Testar:**
 ```bash
 docker compose up -d
 docker compose ps  # todos healthy
-docker compose stop fastapi && sleep 5 && docker compose ps fastapi  # reiniciou
+docker compose stop backend && sleep 5 && docker compose ps backend  # reiniciou
 ```
 
 ---
