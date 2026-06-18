@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: workflow_postgres
+    environment:
+      POSTGRES_USER: workflow_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password}
+      POSTGRES_DB: workflow_studio
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - workflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow_user -d workflow_studio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  workflow_postgres_data:
+    name: ${DB_VOLUME:-workflow_postgres_data}
