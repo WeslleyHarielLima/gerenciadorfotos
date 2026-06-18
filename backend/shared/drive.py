@@ -13,10 +13,29 @@ _BACKOFF_DELAYS = [1, 2, 4, 8, 16]
 
 
 def _get_credentials():
-    from google.oauth2 import service_account
+    # 1. OAuth2 token de usuário (dev/Gmail pessoal)
+    token_file = os.environ.get("GOOGLE_OAUTH_TOKEN_FILE")
+    if token_file and os.path.exists(token_file):
+        import json
+        from google.oauth2.credentials import Credentials
+        with open(token_file) as f:
+            data = json.load(f)
+        return Credentials(
+            token=data.get("token"),
+            refresh_token=data["refresh_token"],
+            token_uri=data["token_uri"],
+            client_id=data["client_id"],
+            client_secret=data["client_secret"],
+            scopes=data.get("scopes", SCOPES),
+        )
+
+    # 2. Service account (prod / Google Workspace com Shared Drive)
     creds_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if creds_file:
+    if creds_file and os.path.exists(creds_file):
+        from google.oauth2 import service_account
         return service_account.Credentials.from_service_account_file(creds_file, scopes=SCOPES)
+
+    # 3. Application Default Credentials (fallback)
     import google.auth
     creds, _ = google.auth.default(scopes=SCOPES)
     return creds
