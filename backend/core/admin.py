@@ -3,7 +3,24 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from core.models import User
+from core.models import City, Event, User
+
+
+@admin.register(City)
+class CityAdmin(ModelAdmin):
+    list_display = ("name", "state", "drive_folder_id")
+    list_filter = ("state",)
+    search_fields = ("name", "state")
+    ordering = ("name",)
+
+
+@admin.register(Event)
+class EventAdmin(ModelAdmin):
+    list_display = ("name", "city", "event_date", "status", "location")
+    list_filter = ("status", "city")
+    search_fields = ("name", "location")
+    ordering = ("-event_date",)
+    readonly_fields = ("google_calendar_event_id", "google_drive_folder_id", "created_at", "updated_at")
 
 
 @admin.register(User)
