@@ -1,4 +1,4 @@
-import { AuthResponse, RefreshResponse, User } from "@/lib/types";
+import { AuthResponse, City, Event, RefreshResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -60,6 +60,18 @@ export const ApiClient = {
   async me(): Promise<User> {
     const res = await apiFetch("/auth/me");
     if (!res.ok) throw new Error("Não autenticado.");
+    return res.json();
+  },
+
+  async getCities(): Promise<City[]> {
+    const res = await apiFetch("/dashboard/cities");
+    if (!res.ok) throw new Error("Erro ao carregar cidades.");
+    return res.json();
+  },
+
+  async getEvents(cityId: number): Promise<Event[]> {
+    const res = await apiFetch(`/dashboard/cities/${cityId}/events`);
+    if (!res.ok) throw new Error("Erro ao carregar eventos.");
     return res.json();
   },
 

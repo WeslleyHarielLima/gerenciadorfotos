@@ -18,3 +18,21 @@ export interface RefreshResponse {
   access_token: string;
   token_type: string;
 }
+
+export interface City {
+  id: number;
+  name: string;
+  state: string;
+  drive_folder_id: string;
+  active_event_count: number;
+}
+
+export interface Event {
+  id: number;
+  name: string;
+  description: string;
+  location: string;
+  event_date: string | null;
+  status: string;
+  city_name: string;
+}

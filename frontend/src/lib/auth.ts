@@ -38,6 +38,6 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY);
 }
 
-export function dashboardPathForRole(role: UserRole): string {
-  return `/dashboard/${role}`;
+export function dashboardPathForRole(_role: UserRole): string {
+  return "/dashboard";
 }
