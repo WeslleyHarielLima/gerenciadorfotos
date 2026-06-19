@@ -36,3 +36,50 @@ export interface Event {
   status: string;
   city_name: string;
 }
+
+export interface UploadResultItem {
+  filename: string;
+  success: boolean;
+  media_id: number | null;
+  error: string | null;
+}
+
+export interface UploadResponse {
+  results: UploadResultItem[];
+}
+
+export interface MediaItem {
+  id: number;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  status: string;
+}
+
+export interface TaskItem {
+  task_id: number;
+  media_id: number;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  status: string;
+}
+
+export interface EditorBoard {
+  available: MediaItem[];
+  editing: TaskItem[];
+  sent: TaskItem[];
+}
+
+export interface UploadEditedResultItem {
+  filename: string;
+  success: boolean;
+  media_version_id: number | null;
+  fraud_detected: boolean;
+  unlinked: boolean;
+  error: string | null;
+}
+
+export interface UploadEditedResponse {
+  results: UploadEditedResultItem[];
+}

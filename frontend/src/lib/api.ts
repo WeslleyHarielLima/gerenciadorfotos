@@ -1,4 +1,4 @@
-import { AuthResponse, City, Event, RefreshResponse, User } from "@/lib/types";
+import { AuthResponse, City, EditorBoard, Event, RefreshResponse, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -73,6 +73,81 @@ export const ApiClient = {
     const res = await apiFetch(`/dashboard/cities/${cityId}/events`);
     if (!res.ok) throw new Error("Erro ao carregar eventos.");
     return res.json();
+  },
+
+  async uploadMedia(
+    eventId: number,
+    files: File[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<UploadResponse> {
+    const BATCH = 10;
+    const allResults: UploadResponse["results"] = [];
+    let done = 0;
+
+    for (let i = 0; i < files.length; i += BATCH) {
+      const batch = files.slice(i, i + BATCH);
+      const form = new FormData();
+      form.append("event_id", String(eventId));
+      batch.forEach((f) => form.append("files", f));
+
+      const res = await apiFetch("/media/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail ?? "Falha no upload.");
+      }
+      const data: UploadResponse = await res.json();
+      allResults.push(...data.results);
+      done += batch.length;
+      onProgress?.(done, files.length);
+    }
+
+    return { results: allResults };
+  },
+
+  async getEditorBoard(eventId: number): Promise<EditorBoard> {
+    const res = await apiFetch(`/tasks/editor/board/${eventId}`);
+    if (!res.ok) throw new Error("Erro ao carregar board do editor.");
+    return res.json();
+  },
+
+  async downloadBatch(mediaIds: number[]): Promise<Blob> {
+    const res = await apiFetch("/media/download-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ media_ids: mediaIds }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha no download.");
+    }
+    return res.blob();
+  },
+
+  async uploadEdited(files: File[]): Promise<UploadEditedResponse> {
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
+    const res = await apiFetch("/media/upload-edited", { method: "POST", body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha no upload editado.");
+    }
+    return res.json();
+  },
+
+  async abandonTask(
+    taskId: number,
+    reasonType: string,
+    reasonCustom: string,
+  ): Promise<void> {
+    const res = await apiFetch(`/tasks/${taskId}/abandon`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason_type: reasonType, reason_custom: reasonCustom }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha ao abandonar tarefa.");
+    }
   },
 
   fetch: apiFetch,

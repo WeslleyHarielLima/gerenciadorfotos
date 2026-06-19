@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
-import { Event } from "@/lib/types";
+import { Event, UserRole } from "@/lib/types";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Ativo",
@@ -27,6 +27,7 @@ export default function EventsPage() {
   const cityId = Number(params.cityId);
   const [events, setEvents] = useState<Event[]>([]);
   const [cityName, setCityName] = useState("");
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -36,6 +37,7 @@ export default function EventsPage() {
       router.replace("/");
       return;
     }
+    setUserRole(user.role);
     if (!cityId || isNaN(cityId)) {
       router.replace("/dashboard");
       return;
@@ -87,6 +89,22 @@ export default function EventsPage() {
                 )}
                 {event.description && (
                   <p className="text-sm text-gray-400 mt-1 line-clamp-2">{event.description}</p>
+                )}
+                {(userRole === "uploader" || userRole === "admin") && (
+                  <Link
+                    href={`/dashboard/uploader/${cityId}/${event.id}`}
+                    className="inline-block mt-2 text-xs text-blue-600 font-medium hover:underline"
+                  >
+                    Enviar fotos/vídeos →
+                  </Link>
+                )}
+                {(userRole === "editor" || userRole === "admin") && (
+                  <Link
+                    href={`/dashboard/editor/${cityId}/${event.id}`}
+                    className="inline-block mt-2 text-xs text-purple-600 font-medium hover:underline"
+                  >
+                    Kanban de edição →
+                  </Link>
                 )}
               </div>
               <div className="text-right shrink-0">
