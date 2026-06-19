@@ -17,8 +17,13 @@ import django
 
 logger = logging.getLogger(__name__)
 
-CALENDAR_ID = os.environ.get("GOOGLE_CALENDAR_ID", "")
-DRIVE_ROOT_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
+
+def _calendar_id() -> str:
+    return os.environ.get("GOOGLE_CALENDAR_ID", "")
+
+
+def _drive_root_folder_id() -> str:
+    return os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
 
 BR_STATES = {
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -85,9 +90,10 @@ def _get_or_create_city(city_name: str, state: str):
     )
     if created:
         logger.info("Nova cidade criada: %s/%s", city_name, state)
-        if DRIVE_ROOT_FOLDER_ID:
+        drive_root = _drive_root_folder_id()
+        if drive_root:
             try:
-                folder_id = create_folder(f"{city_name} - {state}", DRIVE_ROOT_FOLDER_ID)
+                folder_id = create_folder(f"{city_name} - {state}", drive_root)
                 city.drive_folder_id = folder_id
                 city.save(update_fields=["drive_folder_id"])
                 logger.info("Pasta criada no Drive para %s/%s: %s", city_name, state, folder_id)
@@ -180,7 +186,8 @@ def _sync_event(calendar_event: dict) -> str:
     else:
         drive_folder_id = ""
         drive_upload_folder_id = ""
-        if city.drive_folder_id and DRIVE_ROOT_FOLDER_ID:
+        drive_root = _drive_root_folder_id()
+        if city.drive_folder_id and drive_root:
             try:
                 folders = create_event_folder_structure(summary, city.drive_folder_id)
                 drive_folder_id = folders["event_folder_id"]
@@ -208,7 +215,8 @@ def run() -> dict:
     from core.models import ScriptExecutionLog
     from shared.calendar_client import list_events
 
-    if not CALENDAR_ID:
+    calendar_id = _calendar_id()
+    if not calendar_id:
         logger.error("GOOGLE_CALENDAR_ID não configurado.")
         ScriptExecutionLog.objects.create(
             script_name="calendar_sync",
@@ -230,7 +238,7 @@ def run() -> dict:
         sync_kwargs["time_min"] = "2020-01-01T00:00:00Z"
 
     try:
-        result = list_events(CALENDAR_ID, **sync_kwargs)
+        result = list_events(calendar_id, **sync_kwargs)
     except Exception as exc:
         tb = traceback.format_exc()
         logger.error("Falha ao buscar eventos do Calendar: %s", exc)
