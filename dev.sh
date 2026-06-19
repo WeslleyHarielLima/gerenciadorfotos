@@ -37,7 +37,7 @@ done
 
 # ── 1. Docker Postgres ─────────────────────────────────────────
 log "Subindo Postgres (Docker)..."
-docker compose -f "$ROOT/docker-compose.yml" up -d
+docker compose -f "$ROOT/docker-compose.yml" up -d postgres
 
 # Aguarda healthcheck
 for i in $(seq 1 20); do
@@ -86,15 +86,31 @@ done
 # ── 3. Frontend Next.js ────────────────────────────────────────
 log "Iniciando frontend (http://localhost:3000)..."
 
+# Garante 3000 livre imediatamente antes de subir o Next.js
+PIDS3=$(lsof -ti:3000 2>/dev/null || true)
+if [ -n "$PIDS3" ]; then
+  warn "Porta 3000 reocupada — encerrando: $PIDS3"
+  kill $PIDS3 2>/dev/null || true
+  sleep 1
+fi
+
 cd "$FRONTEND"
-npm run dev &
+npm run dev -- --port 3000 &
 FRONTEND_PID=$!
 
-# Aguarda frontend responder
+# Aguarda frontend responder (verifica processo + porta)
 for i in $(seq 1 20); do
+  if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+    err "Frontend encerrou inesperadamente (porta 3000 em uso?). Verifique os logs acima."
+    exit 1
+  fi
   if curl -s -o /dev/null -w "%{http_code}" localhost:3000 | grep -q "200"; then
     ok "Frontend pronto."
     break
+  fi
+  if [ "$i" -eq 20 ]; then
+    err "Frontend não respondeu. Verifique os logs acima."
+    exit 1
   fi
   sleep 2
 done
