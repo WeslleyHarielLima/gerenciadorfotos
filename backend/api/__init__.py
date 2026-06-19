@@ -8,6 +8,13 @@ from api.routers.media import router as media_router
 from api.routers.tasks import router as tasks_router
 
 api = NinjaAPI(title="Workflow Studio API", version="1.0", auth=JWTAuth())
+
+
+@api.get("/health", auth=None, tags=["health"])
+def health(request):
+    return {"status": "ok"}
+
+
 api.add_router("/auth", auth_router)
 api.add_router("/admin", admin_router)
 api.add_router("/dashboard", dashboard_router)
