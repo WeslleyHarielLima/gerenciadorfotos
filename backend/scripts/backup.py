@@ -27,7 +27,10 @@ logger = logging.getLogger(__name__)
 
 BACKUP_RETENTION_DAYS = 30
 BACKUP_FOLDER_NAME = "_backups"
-DRIVE_ROOT_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
+
+
+def _drive_root_folder_id() -> str:
+    return os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
 
 
 def _get_db_config() -> dict:
@@ -44,25 +47,60 @@ def _get_db_config() -> dict:
 
 
 def _run_pg_dump(db: dict) -> bytes:
+    """
+    Tenta pg_dump local primeiro. Se houver mismatch de versão com o servidor,
+    cai para docker compose exec (garante pg_dump 16 dentro do container).
+    """
     env = os.environ.copy()
     env["PGPASSWORD"] = db["password"]
-    result = subprocess.run(
-        [
-            "pg_dump",
-            "-h", db["host"],
-            "-p", db["port"],
-            "-U", db["user"],
-            "-d", db["name"],
-            "--no-password",
-            "--format=plain",
-        ],
-        capture_output=True,
-        env=env,
-        timeout=300,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"pg_dump falhou: {result.stderr.decode()}")
-    return result.stdout
+
+    def _local():
+        result = subprocess.run(
+            [
+                "pg_dump",
+                "-h", db["host"],
+                "-p", db["port"],
+                "-U", db["user"],
+                "-d", db["name"],
+                "--no-password",
+                "--format=plain",
+            ],
+            capture_output=True,
+            env=env,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.decode())
+        return result.stdout
+
+    def _via_docker():
+        # Localiza o docker-compose.yml dois níveis acima de backend/
+        compose_dir = os.path.join(
+            os.path.dirname(__file__), "..", ".."
+        )
+        result = subprocess.run(
+            [
+                "docker", "compose", "exec", "-T", "postgres",
+                "pg_dump",
+                "-U", db["user"],
+                "-d", db["name"],
+                "--format=plain",
+            ],
+            capture_output=True,
+            cwd=os.path.abspath(compose_dir),
+            timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.decode())
+        return result.stdout
+
+    try:
+        return _local()
+    except RuntimeError as exc:
+        if "server version mismatch" in str(exc) or "aborting because of server version" in str(exc):
+            logger.info("pg_dump local com versão diferente do servidor, usando Docker...")
+            return _via_docker()
+        raise
 
 
 def _gzip_bytes(data: bytes) -> bytes:
@@ -75,10 +113,11 @@ def _gzip_bytes(data: bytes) -> bytes:
 def _get_or_create_backup_folder() -> str:
     from shared.drive import create_folder, get_subfolder_id
 
-    existing_id = get_subfolder_id(DRIVE_ROOT_FOLDER_ID, BACKUP_FOLDER_NAME)
+    root = _drive_root_folder_id()
+    existing_id = get_subfolder_id(root, BACKUP_FOLDER_NAME)
     if existing_id:
         return existing_id
-    folder_id = create_folder(BACKUP_FOLDER_NAME, DRIVE_ROOT_FOLDER_ID)
+    folder_id = create_folder(BACKUP_FOLDER_NAME, root)
     logger.info("Pasta _backups criada no Drive: %s", folder_id)
     return folder_id
 
@@ -120,7 +159,7 @@ def _delete_old_backups(folder_id: str):
 def run() -> dict:
     from core.models import ScriptExecutionLog
 
-    if not DRIVE_ROOT_FOLDER_ID:
+    if not _drive_root_folder_id():
         logger.error("GOOGLE_DRIVE_ROOT_FOLDER_ID não configurado.")
         ScriptExecutionLog.objects.create(
             script_name="backup",
