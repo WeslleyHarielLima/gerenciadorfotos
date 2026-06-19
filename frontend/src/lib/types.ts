@@ -83,3 +83,25 @@ export interface UploadEditedResultItem {
 export interface UploadEditedResponse {
   results: UploadEditedResultItem[];
 }
+
+export interface VersionHistoryItem {
+  version: number;
+  status: string;
+  edited_by: string | null;
+  edited_at: string;
+  file_size: number;
+}
+
+export interface ReviewItem {
+  task_id: number;
+  media_id: number;
+  original_filename: string;
+  mime_type: string;
+  original_proxy_url: string;
+  edited_proxy_url: string;
+  version_history: VersionHistoryItem[];
+}
+
+export interface ReviewList {
+  items: ReviewItem[];
+}

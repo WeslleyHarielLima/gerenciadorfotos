@@ -193,6 +193,36 @@ class TaskHistory(models.Model):
         return f"TaskHistory #{self.pk} [{self.decision}] — {self.media}"
 
 
+class PendingDriveDeletion(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pendente"),
+        ("deleted", "Deletado"),
+        ("failed_max_attempts", "Falha máxima"),
+    ]
+
+    drive_file_id = models.CharField(max_length=200)
+    media_version = models.ForeignKey(
+        "MediaVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pending_deletions",
+    )
+    attempts = models.PositiveIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Deleção Pendente"
+        verbose_name_plural = "Deleções Pendentes"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PendingDeletion #{self.pk} [{self.status}] {self.drive_file_id}"
+
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("uploader", "Uploader"),

@@ -1,4 +1,4 @@
-import { AuthResponse, City, EditorBoard, Event, RefreshResponse, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { AuthResponse, City, EditorBoard, Event, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -148,6 +148,48 @@ export const ApiClient = {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as { detail?: string }).detail ?? "Falha ao abandonar tarefa.");
     }
+  },
+
+  async getReviewQueue(): Promise<ReviewList> {
+    const res = await apiFetch("/tasks/review");
+    if (!res.ok) throw new Error("Erro ao carregar fila de revisão.");
+    return res.json();
+  },
+
+  async approveTask(taskId: number): Promise<void> {
+    const res = await apiFetch(`/tasks/${taskId}/approve`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha ao aprovar.");
+    }
+  },
+
+  async rejectWithReturn(taskId: number, feedback: string): Promise<void> {
+    const res = await apiFetch(`/tasks/${taskId}/reject-with-return`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha ao rejeitar.");
+    }
+  },
+
+  async rejectFinal(taskId: number, feedback: string): Promise<void> {
+    const res = await apiFetch(`/tasks/${taskId}/reject-final`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha ao rejeitar definitivamente.");
+    }
+  },
+
+  proxyUrl(driveFileId: string): string {
+    return `${BASE}/media/proxy/${driveFileId}`;
   },
 
   fetch: apiFetch,

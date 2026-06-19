@@ -5,7 +5,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from api.auth import require_role
-from core.models import Media, Task
+from core.models import Media, MediaVersion, PendingDriveDeletion, Task, TaskHistory
 
 router = Router(tags=["tasks"])
 
@@ -143,3 +143,249 @@ def abandon_task(request, task_id: int, payload: AbandonRequest):
     media.save(update_fields=["status", "last_status_change"])
 
     return {"detail": "Tarefa abandonada. Arquivo devolvido ao pool."}
+
+
+# ── Schemas do curador ────────────────────────────────────────────────────────
+
+class VersionHistoryItem(Schema):
+    version: int
+    status: str
+    edited_by: Optional[str]
+    edited_at: str
+    file_size: int
+
+
+class ReviewItemSchema(Schema):
+    task_id: int
+    media_id: int
+    original_filename: str
+    mime_type: str
+    original_proxy_url: str
+    edited_proxy_url: str
+    version_history: List[VersionHistoryItem]
+
+
+class ReviewListSchema(Schema):
+    items: List[ReviewItemSchema]
+
+
+class CuratorDecisionRequest(Schema):
+    feedback: str = ""
+
+
+# ── Endpoints do curador ──────────────────────────────────────────────────────
+
+@router.get("/review", response=ReviewListSchema)
+@require_role("curator")
+def review_queue(request):
+    """Lista itens aguardando revisão do curador autenticado."""
+    curator = request.auth
+
+    tasks = Task.objects.select_related(
+        "media_version__media__event"
+    ).filter(
+        assigned_to=curator,
+        role_type="curator",
+        status="pending",
+    )
+
+    items: List[ReviewItemSchema] = []
+    for task in tasks:
+        edited_version = task.media_version
+        media = edited_version.media
+
+        original_version = media.versions.filter(status="original").order_by("version").first()
+        original_proxy = (
+            f"/api/media/proxy/{original_version.drive_file_id}" if original_version else ""
+        )
+        edited_proxy = f"/api/media/proxy/{edited_version.drive_file_id}"
+
+        history = [
+            VersionHistoryItem(
+                version=v.version,
+                status=v.status,
+                edited_by=v.edited_by.username if v.edited_by else None,
+                edited_at=v.edited_at.isoformat(),
+                file_size=v.file_size,
+            )
+            for v in media.versions.order_by("version")
+        ]
+
+        items.append(
+            ReviewItemSchema(
+                task_id=task.id,
+                media_id=media.id,
+                original_filename=media.original_filename,
+                mime_type=media.mime_type,
+                original_proxy_url=original_proxy,
+                edited_proxy_url=edited_proxy,
+                version_history=history,
+            )
+        )
+
+    return ReviewListSchema(items=items)
+
+
+@router.post("/{task_id}/approve")
+@require_role("curator")
+def approve_task(request, task_id: int):
+    """Aprova versão editada. Registra versões intermediárias para deleção e cria task do publicador."""
+    curator = request.auth
+
+    task = Task.objects.select_related("media_version__media").filter(
+        id=task_id, assigned_to=curator, role_type="curator", status="pending"
+    ).first()
+
+    if not task:
+        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+
+    edited_version = task.media_version
+    media = edited_version.media
+
+    # Marcar versão editada como aprovada
+    edited_version.status = "approved"
+    edited_version.save(update_fields=["status"])
+
+    media.status = "approved"
+    media.save(update_fields=["status", "last_status_change"])
+
+    # Registrar versões intermediárias (edited que não é a aprovada) para deleção
+    intermediate_versions = media.versions.filter(status="edited").exclude(id=edited_version.id)
+    for v in intermediate_versions:
+        PendingDriveDeletion.objects.create(
+            drive_file_id=v.drive_file_id,
+            media_version=v,
+        )
+
+    # Concluir task do curador
+    task.status = "completed"
+    task.save(update_fields=["status", "updated_at"])
+
+    # Histórico
+    TaskHistory.objects.create(
+        media=media,
+        media_version=edited_version,
+        reviewed_by=curator,
+        decision="approved",
+    )
+
+    # Criar task do publicador
+    from core.models import User
+    publisher = User.objects.filter(role="publisher", is_active=True).first()
+    if not publisher:
+        raise HttpError(500, "Nenhum publicador ativo encontrado no sistema.")
+
+    Task.objects.create(
+        media_version=edited_version,
+        assigned_to=publisher,
+        role_type="publisher",
+        status="pending",
+    )
+
+    return {"detail": "Mídia aprovada. Task do publicador criada."}
+
+
+@router.post("/{task_id}/reject-with-return")
+@require_role("curator")
+def reject_with_return(request, task_id: int, payload: CuratorDecisionRequest):
+    """Rejeita com retorno ao editor: volta para selected_for_edit e reabre task do editor."""
+    if not payload.feedback.strip():
+        raise HttpError(400, "Justificativa obrigatória para rejeição.")
+
+    curator = request.auth
+
+    task = Task.objects.select_related("media_version__media").filter(
+        id=task_id, assigned_to=curator, role_type="curator", status="pending"
+    ).first()
+
+    if not task:
+        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+
+    edited_version = task.media_version
+    media = edited_version.media
+
+    # Marcar versão editada como rejeitada
+    edited_version.status = "rejected"
+    edited_version.save(update_fields=["status"])
+
+    # Voltar status da mídia
+    media.status = "selected_for_edit"
+    media.save(update_fields=["status", "last_status_change"])
+
+    # Concluir task do curador
+    task.status = "completed"
+    task.feedback = payload.feedback.strip()
+    task.save(update_fields=["status", "feedback", "updated_at"])
+
+    # Histórico
+    TaskHistory.objects.create(
+        media=media,
+        media_version=edited_version,
+        reviewed_by=curator,
+        decision="rejected_with_return",
+        feedback=payload.feedback.strip(),
+    )
+
+    # Reabrir task do editor (última task completed do editor para essa mídia)
+    original_version = media.versions.filter(status="original").first()
+    if original_version:
+        editor_task = Task.objects.filter(
+            media_version=original_version,
+            role_type="editor",
+            status="completed",
+        ).order_by("-updated_at").first()
+
+        if editor_task:
+            editor_task.status = "in_progress"
+            editor_task.feedback = payload.feedback.strip()
+            editor_task.save(update_fields=["status", "feedback", "updated_at"])
+
+    return {"detail": "Mídia devolvida ao editor para correção."}
+
+
+@router.post("/{task_id}/reject-final")
+@require_role("curator")
+def reject_final(request, task_id: int, payload: CuratorDecisionRequest):
+    """Rejeição definitiva: rejected_final, todas as versões editadas entram na fila de deleção."""
+    if not payload.feedback.strip():
+        raise HttpError(400, "Justificativa obrigatória para rejeição definitiva.")
+
+    curator = request.auth
+
+    task = Task.objects.select_related("media_version__media").filter(
+        id=task_id, assigned_to=curator, role_type="curator", status="pending"
+    ).first()
+
+    if not task:
+        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+
+    edited_version = task.media_version
+    media = edited_version.media
+
+    media.status = "rejected_final"
+    media.save(update_fields=["status", "last_status_change"])
+
+    # Registrar todas as versões editadas para deleção
+    for v in media.versions.filter(status="edited"):
+        PendingDriveDeletion.objects.create(
+            drive_file_id=v.drive_file_id,
+            media_version=v,
+        )
+        v.status = "rejected"
+        v.save(update_fields=["status"])
+
+    # Concluir task do curador
+    task.status = "completed"
+    task.feedback = payload.feedback.strip()
+    task.save(update_fields=["status", "feedback", "updated_at"])
+
+    # Histórico
+    TaskHistory.objects.create(
+        media=media,
+        media_version=edited_version,
+        reviewed_by=curator,
+        decision="rejected_final",
+        feedback=payload.feedback.strip(),
+    )
+
+    return {"detail": "Mídia rejeitada definitivamente. Versões editadas agendadas para deleção."}

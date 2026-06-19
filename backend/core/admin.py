@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from core.models import City, Event, Media, MediaVersion, Task, TaskHistory, User
+from core.models import City, Event, Media, MediaVersion, PendingDriveDeletion, Task, TaskHistory, User
 
 
 @admin.register(City)
@@ -63,6 +63,29 @@ class TaskHistoryAdmin(ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PendingDriveDeletion)
+class PendingDriveDeletionAdmin(ModelAdmin):
+    list_display = ("id", "drive_file_id", "media_version", "attempts", "status", "last_attempt_at", "created_at")
+    list_filter = ("status",)
+    search_fields = ("drive_file_id",)
+    ordering = ("-created_at",)
+    readonly_fields = ("drive_file_id", "media_version", "attempts", "last_attempt_at", "error_message", "created_at")
+
+    def get_list_display_links(self, request, list_display):
+        return ("id",)
+
+    def changelist_view(self, request, extra_context=None):
+        high_attempts = PendingDriveDeletion.objects.filter(attempts__gte=3, status="pending").count()
+        extra_context = extra_context or {}
+        if high_attempts:
+            self.message_user(
+                request,
+                f"⚠ {high_attempts} item(ns) com 3+ tentativas falhas aguardando limpeza.",
+                level="warning",
+            )
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.register(User)

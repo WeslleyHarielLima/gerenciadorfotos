@@ -346,3 +346,27 @@ def _get_any_curator():
     if not curator:
         raise HttpError(500, "Nenhum curador ativo encontrado no sistema.")
     return curator
+
+
+@router.get("/proxy/{drive_file_id}")
+def proxy_media(request, drive_file_id: str):
+    """Proxy autenticado para visualização de mídia do Drive."""
+    if not request.auth:
+        raise HttpError(401, "Não autenticado.")
+
+    try:
+        data = get_file_bytes(drive_file_id)
+    except Exception as exc:
+        raise HttpError(502, f"Falha ao obter arquivo do Drive: {exc}")
+
+    # Detectar mime_type a partir do cabeçalho dos bytes
+    import imghdr
+    img_type = imghdr.what(None, h=data[:512])
+    if img_type:
+        content_type = f"image/{img_type}"
+    else:
+        content_type = "application/octet-stream"
+
+    response = HttpResponse(data, content_type=content_type)
+    response["Cache-Control"] = "private, max-age=900"
+    return response
