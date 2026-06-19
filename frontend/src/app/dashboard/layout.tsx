@@ -47,6 +47,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         {user && (
           <div className="flex items-center gap-4">
+            {user.role === "admin" && (
+              <Link href="/dashboard/admin" className="text-sm text-gray-600 hover:text-blue-600 transition-colors">
+                Painel Admin
+              </Link>
+            )}
             <span className="text-sm text-gray-600">{user.username}</span>
             <button
               onClick={handleLogout}

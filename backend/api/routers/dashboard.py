@@ -5,7 +5,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
 
-from core.models import City, Event
+from core.models import City, Event, Task
 
 router = Router(tags=["dashboard"])
 
@@ -55,3 +55,42 @@ def list_events(request, city_id: int):
         .select_related("city")
         .order_by("-event_date")
     )
+
+
+class ActiveTaskOut(Schema):
+    task_id: int
+    role_type: str
+    media_id: int
+    filename: str
+    event_id: int
+    event_name: str
+    city_id: int
+    city_name: str
+
+
+@router.get("/active-tasks", response=List[ActiveTaskOut])
+def active_tasks(request):
+    """Retorna as tasks em andamento ou pendentes do usuário autenticado."""
+    user = request.auth
+    tasks = (
+        Task.objects.select_related(
+            "media_version__media__event__city"
+        )
+        .filter(assigned_to=user, status__in=["pending", "in_progress"])
+        .order_by("-created_at")
+    )
+    result = []
+    for t in tasks:
+        media = t.media_version.media
+        event = media.event
+        result.append(ActiveTaskOut(
+            task_id=t.id,
+            role_type=t.role_type,
+            media_id=media.id,
+            filename=media.original_filename,
+            event_id=event.id,
+            event_name=event.name,
+            city_id=event.city.id,
+            city_name=str(event.city),
+        ))
+    return result

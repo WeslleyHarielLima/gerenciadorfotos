@@ -1,4 +1,4 @@
-import { AuthResponse, City, EditorBoard, Event, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -205,6 +205,26 @@ export const ApiClient = {
   async getPublishHistory(): Promise<PublishHistory> {
     const res = await apiFetch("/tasks/publish/history");
     if (!res.ok) throw new Error("Erro ao carregar histórico de publicações.");
+    return res.json();
+  },
+
+  async getActiveTasks(): Promise<ActiveTask[]> {
+    const res = await apiFetch("/dashboard/active-tasks");
+    if (!res.ok) throw new Error("Erro ao carregar tarefas em andamento.");
+    return res.json();
+  },
+
+  async getAdminOverview(cityId?: number): Promise<AdminOverview> {
+    const url = cityId ? `/admin/overview?city_id=${cityId}` : "/admin/overview";
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error("Erro ao carregar visão geral.");
+    return res.json();
+  },
+
+  async getBottlenecks(cityId?: number): Promise<BottlenecksResponse> {
+    const url = cityId ? `/admin/bottlenecks?city_id=${cityId}` : "/admin/bottlenecks";
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error("Erro ao carregar gargalos.");
     return res.json();
   },
 

@@ -140,3 +140,61 @@ export interface PublishHistoryGroup {
 export interface PublishHistory {
   groups: PublishHistoryGroup[];
 }
+
+export interface ActiveTask {
+  task_id: number;
+  role_type: string;
+  media_id: number;
+  filename: string;
+  event_id: number;
+  event_name: string;
+  city_id: number;
+  city_name: string;
+}
+
+export interface BottleneckItem {
+  phase: string;
+  event_id: number;
+  event_name: string;
+  city_name: string;
+  media_id: number;
+  filename: string;
+  hours_stuck: number;
+  threshold_hours: number;
+  assigned_to: string | null;
+}
+
+export interface BottlenecksResponse {
+  bottlenecks: BottleneckItem[];
+  thresholds: Record<string, number>;
+}
+
+export interface PhaseCounts {
+  uploaded: number;
+  selected_for_edit: number;
+  pending_review: number;
+  approved: number;
+  published: number;
+  rejected_final: number;
+}
+
+export interface EventOverviewItem {
+  id: number;
+  name: string;
+  city_name: string;
+  event_date: string | null;
+  counts: PhaseCounts;
+  total_active: number;
+}
+
+export interface ScriptHealthItem {
+  last_status: string | null;
+  last_run: string | null;
+  is_healthy: boolean;
+}
+
+export interface AdminOverview {
+  events: EventOverviewItem[];
+  script_health: Record<string, ScriptHealthItem>;
+  pending_validation_count: number;
+}
