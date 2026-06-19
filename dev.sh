@@ -19,7 +19,7 @@ err()  { echo -e "${RED}[erro]${NC} $*"; }
 
 cleanup() {
   log "Encerrando serviços..."
-  kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
+  kill "$BACKEND_PID" "$FRONTEND_PID" "$CALENDAR_SYNC_PID" 2>/dev/null || true
   docker compose -f "$ROOT/docker-compose.yml" down 2>/dev/null || true
   ok "Tudo parado."
 }
@@ -114,6 +114,22 @@ for i in $(seq 1 20); do
   fi
   sleep 2
 done
+
+# ── 4. Calendar Sync (loop a cada 60s em dev) ─────────────────
+log "Iniciando calendar_sync (sincroniza Google Agenda a cada 60s)..."
+
+cd "$BACKEND"
+(
+  source .venv/bin/activate
+  export DJANGO_SETTINGS_MODULE=config.settings
+  export DB_PORT=5433
+  while true; do
+    python scripts/calendar_sync.py >> /tmp/calendar_sync_dev.log 2>&1
+    sleep 60
+  done
+) &
+CALENDAR_SYNC_PID=$!
+ok "calendar_sync rodando (logs em /tmp/calendar_sync_dev.log)."
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
