@@ -1,4 +1,4 @@
-import { AuthResponse, City, EditorBoard, Event, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { AuthResponse, City, EditorBoard, Event, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -186,6 +186,26 @@ export const ApiClient = {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as { detail?: string }).detail ?? "Falha ao rejeitar definitivamente.");
     }
+  },
+
+  async getPublishQueue(): Promise<PublishList> {
+    const res = await apiFetch("/tasks/publish");
+    if (!res.ok) throw new Error("Erro ao carregar fila de publicação.");
+    return res.json();
+  },
+
+  async publishTask(taskId: number): Promise<void> {
+    const res = await apiFetch(`/tasks/${taskId}/publish`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? "Falha ao publicar.");
+    }
+  },
+
+  async getPublishHistory(): Promise<PublishHistory> {
+    const res = await apiFetch("/tasks/publish/history");
+    if (!res.ok) throw new Error("Erro ao carregar histórico de publicações.");
+    return res.json();
   },
 
   proxyUrl(driveFileId: string): string {

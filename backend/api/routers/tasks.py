@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import List, Optional
 
 from django.utils import timezone
@@ -389,3 +390,157 @@ def reject_final(request, task_id: int, payload: CuratorDecisionRequest):
     )
 
     return {"detail": "Mídia rejeitada definitivamente. Versões editadas agendadas para deleção."}
+
+
+# ── Schemas do publicador ─────────────────────────────────────────────────────
+
+class PublishItemSchema(Schema):
+    task_id: int
+    media_id: int
+    original_filename: str
+    mime_type: str
+    proxy_url: str
+    event_name: str
+    city_name: str
+    event_id: int
+    city_id: int
+
+
+class PublishListSchema(Schema):
+    items: List[PublishItemSchema]
+
+
+class PublishHistoryItemSchema(Schema):
+    task_id: int
+    media_id: int
+    original_filename: str
+    mime_type: str
+    published_at: str
+    event_name: str
+    city_name: str
+
+
+class PublishHistoryGroupSchema(Schema):
+    date: str
+    items: List[PublishHistoryItemSchema]
+
+
+class PublishHistorySchema(Schema):
+    groups: List[PublishHistoryGroupSchema]
+
+
+# ── Endpoints do publicador ───────────────────────────────────────────────────
+
+@router.get("/publish", response=PublishListSchema)
+@require_role("publisher")
+def publish_queue(request):
+    """Lista tasks pendentes do publicador autenticado."""
+    publisher = request.auth
+
+    tasks = Task.objects.select_related(
+        "media_version__media__event__city"
+    ).filter(
+        assigned_to=publisher,
+        role_type="publisher",
+        status="pending",
+    )
+
+    items: List[PublishItemSchema] = []
+    for task in tasks:
+        version = task.media_version
+        media = version.media
+        event = media.event
+        city = event.city
+
+        items.append(PublishItemSchema(
+            task_id=task.id,
+            media_id=media.id,
+            original_filename=media.original_filename,
+            mime_type=media.mime_type,
+            proxy_url=f"/api/media/proxy/{version.drive_file_id}",
+            event_name=event.name,
+            city_name=str(city),
+            event_id=event.id,
+            city_id=city.id,
+        ))
+
+    return PublishListSchema(items=items)
+
+
+@router.post("/{task_id}/publish")
+@require_role("publisher")
+def publish_task(request, task_id: int):
+    """Publica versão aprovada: move arquivo para 05_published e atualiza status."""
+    from shared.drive import create_folder, get_subfolder_id, move_file
+
+    publisher = request.auth
+
+    task = Task.objects.select_related("media_version__media__event").filter(
+        id=task_id, assigned_to=publisher, role_type="publisher", status="pending"
+    ).first()
+
+    if not task:
+        raise HttpError(404, "Tarefa de publicação não encontrada ou não pertence a você.")
+
+    version = task.media_version
+    media = version.media
+    event = media.event
+
+    if not event.google_drive_folder_id:
+        raise HttpError(500, "Evento sem pasta no Drive configurada.")
+
+    published_folder_id = get_subfolder_id(event.google_drive_folder_id, "05_published")
+    if not published_folder_id:
+        published_folder_id = create_folder("05_published", event.google_drive_folder_id)
+
+    try:
+        move_file(version.drive_file_id, published_folder_id)
+    except Exception as exc:
+        raise HttpError(502, f"Falha ao mover arquivo no Drive: {exc}")
+
+    media.status = "published"
+    media.save(update_fields=["status", "last_status_change"])
+
+    task.status = "completed"
+    task.save(update_fields=["status", "updated_at"])
+
+    return {"detail": "Mídia publicada com sucesso."}
+
+
+@router.get("/publish/history", response=PublishHistorySchema)
+@require_role("publisher")
+def publish_history(request):
+    """Retorna histórico de publicações agrupadas por data."""
+    publisher = request.auth
+
+    tasks = Task.objects.select_related(
+        "media_version__media__event__city"
+    ).filter(
+        assigned_to=publisher,
+        role_type="publisher",
+        status="completed",
+    ).order_by("-updated_at")
+
+    groups_dict: dict = defaultdict(list)
+    for task in tasks:
+        media = task.media_version.media
+        event = media.event
+        city = event.city
+        date_str = task.updated_at.date().isoformat()
+
+        groups_dict[date_str].append(PublishHistoryItemSchema(
+            task_id=task.id,
+            media_id=media.id,
+            original_filename=media.original_filename,
+            mime_type=media.mime_type,
+            published_at=task.updated_at.isoformat(),
+            event_name=event.name,
+            city_name=str(city),
+        ))
+
+    groups = [
+        PublishHistoryGroupSchema(date=date, items=items)
+        for date, items in groups_dict.items()
+    ]
+
+    return PublishHistorySchema(groups=groups)

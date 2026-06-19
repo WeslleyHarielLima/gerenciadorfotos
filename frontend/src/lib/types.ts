@@ -105,3 +105,38 @@ export interface ReviewItem {
 export interface ReviewList {
   items: ReviewItem[];
 }
+
+export interface PublishItem {
+  task_id: number;
+  media_id: number;
+  original_filename: string;
+  mime_type: string;
+  proxy_url: string;
+  event_name: string;
+  city_name: string;
+  event_id: number;
+  city_id: number;
+}
+
+export interface PublishList {
+  items: PublishItem[];
+}
+
+export interface PublishHistoryItem {
+  task_id: number;
+  media_id: number;
+  original_filename: string;
+  mime_type: string;
+  published_at: string;
+  event_name: string;
+  city_name: string;
+}
+
+export interface PublishHistoryGroup {
+  date: string;
+  items: PublishHistoryItem[];
+}
+
+export interface PublishHistory {
+  groups: PublishHistoryGroup[];
+}
