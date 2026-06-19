@@ -223,6 +223,72 @@ class PendingDriveDeletion(models.Model):
         return f"PendingDeletion #{self.pk} [{self.status}] {self.drive_file_id}"
 
 
+class ScriptExecutionLog(models.Model):
+    STATUS_CHOICES = [
+        ("success", "Sucesso"),
+        ("partial", "Parcial"),
+        ("failed", "Falha"),
+    ]
+
+    script_name = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    events_processed = models.PositiveIntegerField(default=0)
+    events_failed = models.PositiveIntegerField(default=0)
+    error_traceback = models.TextField(blank=True)
+    executed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log de Script"
+        verbose_name_plural = "Logs de Script"
+        ordering = ["-executed_at"]
+
+    def __str__(self):
+        return f"{self.script_name} [{self.status}] {self.executed_at:%Y-%m-%d %H:%M}"
+
+
+class ActivityLog(models.Model):
+    ACTION_CHOICES = [
+        ("uploaded", "Upload"),
+        ("selected", "Selecionado"),
+        ("submitted", "Enviado para revisão"),
+        ("approved", "Aprovado"),
+        ("rejected", "Rejeitado"),
+        ("published", "Publicado"),
+        ("abandoned", "Desistência"),
+        ("fraud_attempt", "Tentativa de fraude"),
+        ("calendar_sync_created", "Sync: evento criado"),
+        ("calendar_sync_updated", "Sync: evento atualizado"),
+        ("calendar_sync_cancelled", "Sync: evento cancelado"),
+    ]
+
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activity_logs",
+    )
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    media = models.ForeignKey(
+        "Media",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activity_logs",
+    )
+    details = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log de Atividade"
+        verbose_name_plural = "Logs de Atividade"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        user_str = self.user.username if self.user else "sistema"
+        return f"{self.action} por {user_str} em {self.created_at:%Y-%m-%d %H:%M}"
+
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("uploader", "Uploader"),

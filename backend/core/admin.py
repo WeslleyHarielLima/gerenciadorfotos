@@ -1,9 +1,21 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils import timezone
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from core.models import City, Event, Media, MediaVersion, PendingDriveDeletion, Task, TaskHistory, User
+from core.models import (
+    ActivityLog,
+    City,
+    Event,
+    Media,
+    MediaVersion,
+    PendingDriveDeletion,
+    ScriptExecutionLog,
+    Task,
+    TaskHistory,
+    User,
+)
 
 
 @admin.register(City)
@@ -21,6 +33,29 @@ class EventAdmin(ModelAdmin):
     search_fields = ("name", "location")
     ordering = ("-event_date",)
     readonly_fields = ("google_calendar_event_id", "google_drive_folder_id", "created_at", "updated_at")
+    actions = ["reprocess_pending_validation"]
+
+    @admin.action(description="Reprocessar eventos pendentes de validação")
+    def reprocess_pending_validation(self, request, queryset):
+        pending = queryset.filter(status="pending_validation")
+        count = 0
+        for event in pending:
+            if event.city and event.location:
+                event.status = "active"
+                event.save(update_fields=["status"])
+                count += 1
+        self.message_user(request, f"{count} evento(s) reprocessado(s) para 'active'.")
+
+    def changelist_view(self, request, extra_context=None):
+        pending_count = Event.objects.filter(status="pending_validation").count()
+        extra_context = extra_context or {}
+        if pending_count:
+            self.message_user(
+                request,
+                f"⚠ {pending_count} evento(s) aguardando validação (sem localização no Calendar).",
+                level="warning",
+            )
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.register(Media)
@@ -86,6 +121,65 @@ class PendingDriveDeletionAdmin(ModelAdmin):
                 level="warning",
             )
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(ScriptExecutionLog)
+class ScriptExecutionLogAdmin(ModelAdmin):
+    list_display = ("script_name", "status", "events_processed", "events_failed", "executed_at")
+    list_filter = ("script_name", "status")
+    ordering = ("-executed_at",)
+    readonly_fields = ("script_name", "status", "events_processed", "events_failed", "error_traceback", "executed_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        threshold = timezone.now() - timezone.timedelta(minutes=15)
+        scripts_to_check = ["calendar_sync", "backup"]
+        alerts = []
+        for script in scripts_to_check:
+            last_ok = (
+                ScriptExecutionLog.objects.filter(script_name=script, status="success")
+                .order_by("-executed_at")
+                .first()
+            )
+            if not last_ok or last_ok.executed_at < threshold:
+                alerts.append(script)
+
+        if alerts:
+            self.message_user(
+                request,
+                f"⚠ Scripts sem sucesso nos últimos 15 min: {', '.join(alerts)}",
+                level="warning",
+            )
+
+        failed_count = ScriptExecutionLog.objects.filter(status="failed").count()
+        if failed_count:
+            self.message_user(
+                request,
+                f"⛔ {failed_count} execução(ões) com status 'failed' no histórico.",
+                level="error",
+            )
+
+        return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(ModelAdmin):
+    list_display = ("action", "user", "media", "created_at")
+    list_filter = ("action",)
+    search_fields = ("user__username", "details", "media__original_filename")
+    ordering = ("-created_at",)
+    readonly_fields = ("user", "action", "media", "details", "created_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(User)
