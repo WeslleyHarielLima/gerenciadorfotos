@@ -98,6 +98,14 @@ export default function EventsPage() {
                     Enviar fotos/vídeos →
                   </Link>
                 )}
+                {(userRole === "editor" || userRole === "admin") && (
+                  <Link
+                    href={`/dashboard/editor/${cityId}/${event.id}`}
+                    className="inline-block mt-2 text-xs text-purple-600 font-medium hover:underline"
+                  >
+                    Kanban de edição →
+                  </Link>
+                )}
               </div>
               <div className="text-right shrink-0">
                 <span
