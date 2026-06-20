@@ -54,6 +54,7 @@ export interface MediaItem {
   mime_type: string;
   file_size: number;
   status: string;
+  cloudinary_url?: string | null;
 }
 
 export interface TaskItem {
@@ -63,6 +64,7 @@ export interface TaskItem {
   mime_type: string;
   file_size: number;
   status: string;
+  cloudinary_url?: string | null;
 }
 
 export interface EditorBoard {
@@ -97,6 +99,8 @@ export interface ReviewItem {
   media_id: number;
   original_filename: string;
   mime_type: string;
+  cloudinary_url?: string | null;
+  edited_cloudinary_url?: string | null;
   original_proxy_url: string;
   edited_proxy_url: string;
   version_history: VersionHistoryItem[];
@@ -111,6 +115,7 @@ export interface PublishItem {
   media_id: number;
   original_filename: string;
   mime_type: string;
+  cloudinary_url?: string | null;
   proxy_url: string;
   event_name: string;
   city_name: string;
@@ -146,10 +151,34 @@ export interface ActiveTask {
   role_type: string;
   media_id: number;
   filename: string;
+  cloudinary_url?: string | null;
   event_id: number;
   event_name: string;
   city_id: number;
   city_name: string;
+}
+
+export interface MediaVersionDetail {
+  version: number;
+  status: string;
+  edited_by: string | null;
+  edited_at: string;
+  file_size: number;
+}
+
+export interface MediaDetail {
+  id: number;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  status: string;
+  cloudinary_url: string | null;
+  event_id: number;
+  event_name: string;
+  city_name: string;
+  uploaded_by: string;
+  created_at: string;
+  versions: MediaVersionDetail[];
 }
 
 export interface BottleneckItem {

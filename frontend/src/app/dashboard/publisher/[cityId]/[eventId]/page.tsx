@@ -156,24 +156,38 @@ export default function PublisherKanbanPage() {
             {queue.map((item) => (
               <div
                 key={item.task_id}
-                className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-3"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col"
               >
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 truncate">
-                    {item.original_filename}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">{item.mime_type}</p>
+                {/* Thumbnail */}
+                {item.cloudinary_url ? (
+                  <img
+                    src={item.cloudinary_url}
+                    alt={item.original_filename}
+                    className="w-full h-36 object-cover bg-gray-100"
+                  />
+                ) : (
+                  <div className="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-4xl">
+                    🖼
+                  </div>
+                )}
+                <div className="p-4 flex flex-col gap-2 flex-1">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {item.original_filename}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{item.mime_type}</p>
+                  </div>
+                  <div className="text-xs text-gray-400 space-y-0.5">
+                    <p>{item.event_name}</p>
+                    <p>{item.city_name}</p>
+                  </div>
+                  <button
+                    onClick={() => setConfirm({ item, loading: false, error: "" })}
+                    className="mt-auto w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                  >
+                    Publicar
+                  </button>
                 </div>
-                <div className="text-xs text-gray-400 space-y-0.5">
-                  <p>{item.event_name}</p>
-                  <p>{item.city_name}</p>
-                </div>
-                <button
-                  onClick={() => setConfirm({ item, loading: false, error: "" })}
-                  className="mt-auto w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-                >
-                  Publicar
-                </button>
               </div>
             ))}
           </div>
@@ -226,38 +240,53 @@ export default function PublisherKanbanPage() {
       {/* ── Modal de confirmação de publicação ── */}
       {confirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="font-semibold text-gray-900 mb-2">Confirmar publicação</h3>
-            <p className="text-sm text-gray-600 mb-1 truncate">
-              <span className="font-medium">{confirm.item.original_filename}</span>
-            </p>
-            <p className="text-xs text-gray-400 mb-4">
-              {confirm.item.event_name} · {confirm.item.city_name}
-            </p>
-            <p className="text-sm text-gray-600 mb-5">
-              O arquivo será movido para a pasta de publicados no Drive e marcado como publicado.
-              Esta ação não pode ser desfeita.
-            </p>
-
-            {confirm.error && (
-              <p className="text-xs text-red-600 mb-3">{confirm.error}</p>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Preview da foto no topo do modal */}
+            {confirm.item.cloudinary_url ? (
+              <img
+                src={confirm.item.cloudinary_url}
+                alt={confirm.item.original_filename}
+                className="w-full h-48 object-cover bg-gray-100"
+              />
+            ) : (
+              <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-gray-300 text-4xl">
+                🖼
+              </div>
             )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirm(null)}
-                disabled={confirm.loading}
-                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handlePublish}
-                disabled={confirm.loading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                {confirm.loading ? "Publicando..." : "Confirmar publicação"}
-              </button>
+            <div className="p-6">
+              <h3 className="font-semibold text-gray-900 mb-1">Confirmar publicação</h3>
+              <p className="text-sm text-gray-800 font-medium truncate mb-0.5">
+                {confirm.item.original_filename}
+              </p>
+              <p className="text-xs text-gray-400 mb-4">
+                {confirm.item.event_name} · {confirm.item.city_name}
+              </p>
+              <p className="text-sm text-gray-600 mb-5">
+                O arquivo será movido para a pasta de publicados no Drive e marcado como publicado.
+                Esta ação não pode ser desfeita.
+              </p>
+
+              {confirm.error && (
+                <p className="text-xs text-red-600 mb-3">{confirm.error}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirm(null)}
+                  disabled={confirm.loading}
+                  className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={confirm.loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  {confirm.loading ? "Publicando..." : "Confirmar publicação"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

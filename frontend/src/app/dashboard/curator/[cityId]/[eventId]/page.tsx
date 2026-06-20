@@ -228,15 +228,29 @@ export default function CuratorKanbanPage() {
           <button
             key={item.task_id}
             onClick={() => openModal(item)}
-            className="text-left bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-400 hover:shadow-sm transition-all group"
+            className="text-left bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-blue-400 hover:shadow-sm transition-all group"
           >
-            <p className="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-700">
-              {item.original_filename}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">{item.mime_type}</p>
-            <p className="text-xs text-gray-400 mt-3">
-              {item.version_history.length} versão(ões) · clique para revisar
-            </p>
+            {/* Thumbnail do card */}
+            {item.cloudinary_url ? (
+              <img
+                src={item.cloudinary_url}
+                alt={item.original_filename}
+                className="w-full h-36 object-cover bg-gray-100"
+              />
+            ) : (
+              <div className="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-4xl">
+                🖼
+              </div>
+            )}
+            <div className="p-4">
+              <p className="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-700">
+                {item.original_filename}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">{item.mime_type}</p>
+              <p className="text-xs text-gray-400 mt-2">
+                {item.version_history.length} versão(ões) · clique para revisar
+              </p>
+            </div>
           </button>
         ))}
       </div>
@@ -264,19 +278,35 @@ export default function CuratorKanbanPage() {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Original
                 </p>
-                <MediaViewer
-                  proxyUrl={modal.item.original_proxy_url}
-                  alt="Versão original"
-                />
+                {modal.item.cloudinary_url ? (
+                  <img
+                    src={modal.item.cloudinary_url}
+                    alt="Versão original"
+                    className="w-full rounded-lg object-contain max-h-80 bg-gray-50"
+                  />
+                ) : (
+                  <MediaViewer
+                    proxyUrl={modal.item.original_proxy_url}
+                    alt="Versão original"
+                  />
+                )}
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Editada
                 </p>
-                <MediaViewer
-                  proxyUrl={modal.item.edited_proxy_url}
-                  alt="Versão editada"
-                />
+                {modal.item.edited_cloudinary_url ? (
+                  <img
+                    src={modal.item.edited_cloudinary_url}
+                    alt="Versão editada"
+                    className="w-full rounded-lg object-contain max-h-80 bg-gray-50"
+                  />
+                ) : (
+                  <MediaViewer
+                    proxyUrl={modal.item.edited_proxy_url}
+                    alt="Versão editada"
+                  />
+                )}
               </div>
             </div>
 

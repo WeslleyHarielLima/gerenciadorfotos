@@ -10,6 +10,7 @@ from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
 from api.auth import require_role
+from api.services.cloudinary_service import upload_thumbnail, upload_version_thumbnail
 from api.services.exif import inject_media_id_exif
 from api.services.hash import calculate_sha256
 from core.models import Event, Media, MediaVersion, Task, TaskHistory
@@ -41,6 +42,7 @@ class UploadResultItem(Schema):
     filename: str
     success: bool
     media_id: int | None = None
+    cloudinary_url: str | None = None
     error: str | None = None
 
 
@@ -129,7 +131,18 @@ def upload_media(
             file_size=len(data),
         )
 
-        results.append(UploadResultItem(filename=f.name, success=True, media_id=media.id))
+        cloudinary_result = upload_thumbnail(data, media.id, f.content_type)
+        if cloudinary_result:
+            media.cloudinary_url = cloudinary_result["url"]
+            media.cloudinary_public_id = cloudinary_result["public_id"]
+            media.save(update_fields=["cloudinary_url", "cloudinary_public_id"])
+
+        results.append(UploadResultItem(
+            filename=f.name,
+            success=True,
+            media_id=media.id,
+            cloudinary_url=media.cloudinary_url or None,
+        ))
 
     return UploadResponse(results=results)
 
@@ -168,6 +181,12 @@ def download_batch(request, payload: DownloadBatchRequest):
 
             data = inject_media_id_exif(data, media.id, media.mime_type)
 
+            from api.services.watermark import embed_watermark
+            data = embed_watermark(data, media.id, media.mime_type)
+
+            from api.services.perceptual import compute as phash_compute
+            perceptual_hash = phash_compute(data)
+
             zf.writestr(media.original_filename, data)
 
             media.status = "selected_for_edit"
@@ -178,6 +197,7 @@ def download_batch(request, payload: DownloadBatchRequest):
                 assigned_to=editor,
                 role_type="editor",
                 status="in_progress",
+                perceptual_hash=perceptual_hash,
             )
 
     buf.seek(0)
@@ -223,48 +243,85 @@ def upload_edited(
     for f in files:
         data = f.read()
 
-        # Extrair media_id do EXIF
         from api.services.exif import extract_media_id_exif
         media_id = extract_media_id_exif(data)
 
-        if media_id is None:
-            results.append(
-                UploadEditedResultItem(filename=f.name, success=False, unlinked=True,
-                                       error="Arquivo sem EXIF de vínculo. Use a tela de vínculo manual.")
-            )
-            continue
+        task = None
+        media = None
 
-        try:
-            media = Media.objects.get(id=media_id)
-        except Media.DoesNotExist:
-            results.append(
-                UploadEditedResultItem(filename=f.name, success=False,
-                                       error=f"Mídia #{media_id} não encontrada.")
-            )
-            continue
+        if media_id is not None:
+            # Identificação via EXIF (JPEG/JPG)
+            try:
+                media = Media.objects.get(id=media_id)
+            except Media.DoesNotExist:
+                results.append(
+                    UploadEditedResultItem(filename=f.name, success=False,
+                                           error=f"Mídia #{media_id} não encontrada.")
+                )
+                continue
 
-        # Validar task ativa do editor para essa mídia
-        original_version = media.versions.filter(status="original").order_by("version").first()
-        if not original_version:
-            results.append(
-                UploadEditedResultItem(filename=f.name, success=False,
-                                       error=f"Versão original da mídia #{media_id} não encontrada.")
-            )
-            continue
+            original_version = media.versions.filter(status="original").order_by("version").first()
+            if not original_version:
+                results.append(
+                    UploadEditedResultItem(filename=f.name, success=False,
+                                           error=f"Versão original da mídia #{media_id} não encontrada.")
+                )
+                continue
 
-        task = Task.objects.filter(
-            media_version=original_version,
-            assigned_to=editor,
-            role_type="editor",
-            status="in_progress",
-        ).first()
+            task = Task.objects.filter(
+                media_version=original_version,
+                assigned_to=editor,
+                role_type="editor",
+                status="in_progress",
+            ).first()
 
-        if not task:
-            results.append(
-                UploadEditedResultItem(filename=f.name, success=False,
-                                       error=f"Nenhuma task ativa de edição para mídia #{media_id}.")
-            )
-            continue
+            if not task:
+                results.append(
+                    UploadEditedResultItem(filename=f.name, success=False,
+                                           error=f"Nenhuma task ativa de edição para mídia #{media_id}.")
+                )
+                continue
+        else:
+            # Fallback 1: por nome de arquivo original
+            task = Task.objects.filter(
+                assigned_to=editor,
+                role_type="editor",
+                status="in_progress",
+                media_version__media__original_filename=f.name,
+            ).select_related("media_version__media").first()
+
+            if task is None:
+                # Fallback 2: hash perceptual (sobrevive recompressão JPEG e renomeação)
+                from api.services.perceptual import compute as phash_compute, distance as phash_distance, MATCH_THRESHOLD
+                upload_hash = phash_compute(data)
+
+                if upload_hash is not None:
+                    active_tasks = Task.objects.select_related("media_version__media").filter(
+                        assigned_to=editor,
+                        role_type="editor",
+                        status="in_progress",
+                        perceptual_hash__isnull=False,
+                    )
+                    best_task = None
+                    best_dist = MATCH_THRESHOLD + 1
+                    for candidate in active_tasks:
+                        dist = phash_distance(upload_hash, candidate.perceptual_hash)
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_task = candidate
+                    if best_task is not None:
+                        task = best_task
+                        media = task.media_version.media
+
+            if task is None:
+                results.append(
+                    UploadEditedResultItem(filename=f.name, success=False, unlinked=True,
+                                           error="Arquivo não identificado (EXIF, nome e hash visual não encontrados). Mantenha o nome original ao exportar.")
+                )
+                continue
+
+            if media is None:
+                media = task.media_version.media
 
         # Anti-fraude: hash da versão editada deve diferir do original
         new_hash = calculate_sha256(data)
@@ -317,6 +374,13 @@ def upload_edited(
             file_size=len(data),
         )
 
+        # Upload da versão editada ao Cloudinary para comparação no painel do curador
+        cloudinary_result = upload_version_thumbnail(data, media.id, next_version, f.content_type)
+        if cloudinary_result:
+            media_version.cloudinary_url = cloudinary_result["url"]
+            media_version.cloudinary_public_id = cloudinary_result["public_id"]
+            media_version.save(update_fields=["cloudinary_url", "cloudinary_public_id"])
+
         media.status = "pending_review"
         media.save(update_fields=["status", "last_status_change"])
 
@@ -346,6 +410,65 @@ def _get_any_curator():
     if not curator:
         raise HttpError(500, "Nenhum curador ativo encontrado no sistema.")
     return curator
+
+
+class MediaVersionDetail(Schema):
+    version: int
+    status: str
+    edited_by: str | None = None
+    edited_at: str
+    file_size: int
+
+
+class MediaDetailSchema(Schema):
+    id: int
+    original_filename: str
+    mime_type: str
+    file_size: int
+    status: str
+    cloudinary_url: str | None = None
+    event_id: int
+    event_name: str
+    city_name: str
+    uploaded_by: str
+    created_at: str
+    versions: List[MediaVersionDetail]
+
+
+@router.get("/{media_id}/detail", response=MediaDetailSchema)
+def media_detail(request, media_id: int):
+    """Retorna metadados completos e histórico de versões de uma mídia."""
+    if not request.auth:
+        raise HttpError(401, "Não autenticado.")
+
+    from django.shortcuts import get_object_or_404
+    media = get_object_or_404(Media, id=media_id)
+
+    versions = [
+        MediaVersionDetail(
+            version=v.version,
+            status=v.status,
+            edited_by=v.edited_by.username if v.edited_by else None,
+            edited_at=v.edited_at.isoformat(),
+            file_size=v.file_size,
+        )
+        for v in media.versions.order_by("version")
+    ]
+
+    return MediaDetailSchema(
+        id=media.id,
+        original_filename=media.original_filename,
+        mime_type=media.mime_type,
+        file_size=media.file_size,
+        status=media.status,
+        cloudinary_url=media.cloudinary_url or None,
+        event_id=media.event.id,
+        event_name=media.event.name,
+        city_name=str(media.event.city),
+        uploaded_by=media.uploaded_by.username,
+        created_at=media.created_at.isoformat(),
+        versions=versions,
+    )
 
 
 @router.get("/proxy/{drive_file_id}")

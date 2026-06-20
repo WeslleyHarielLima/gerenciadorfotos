@@ -19,6 +19,7 @@ class MediaItemSchema(Schema):
     mime_type: str
     file_size: int
     status: str
+    cloudinary_url: Optional[str] = None
 
 
 class TaskItemSchema(Schema):
@@ -28,6 +29,7 @@ class TaskItemSchema(Schema):
     mime_type: str
     file_size: int
     status: str
+    cloudinary_url: Optional[str] = None
 
 
 class EditorBoardSchema(Schema):
@@ -54,6 +56,7 @@ def editor_board(request, event_id: int):
             mime_type=m.mime_type,
             file_size=m.file_size,
             status=m.status,
+            cloudinary_url=m.cloudinary_url or None,
         )
         for m in Media.objects.filter(event=event, status="uploaded")
     ]
@@ -72,6 +75,7 @@ def editor_board(request, event_id: int):
             mime_type=t.media_version.media.mime_type,
             file_size=t.media_version.media.file_size,
             status=t.media_version.media.status,
+            cloudinary_url=t.media_version.media.cloudinary_url or None,
         )
         for t in editing_tasks
     ]
@@ -90,6 +94,7 @@ def editor_board(request, event_id: int):
             mime_type=t.media_version.media.mime_type,
             file_size=t.media_version.media.file_size,
             status=t.media_version.media.status,
+            cloudinary_url=t.media_version.media.cloudinary_url or None,
         )
         for t in sent_tasks
     ]
@@ -161,6 +166,8 @@ class ReviewItemSchema(Schema):
     media_id: int
     original_filename: str
     mime_type: str
+    cloudinary_url: Optional[str] = None
+    edited_cloudinary_url: Optional[str] = None
     original_proxy_url: str
     edited_proxy_url: str
     version_history: List[VersionHistoryItem]
@@ -218,6 +225,8 @@ def review_queue(request):
                 media_id=media.id,
                 original_filename=media.original_filename,
                 mime_type=media.mime_type,
+                cloudinary_url=media.cloudinary_url or None,
+                edited_cloudinary_url=edited_version.cloudinary_url or None,
                 original_proxy_url=original_proxy,
                 edited_proxy_url=edited_proxy,
                 version_history=history,
@@ -399,6 +408,7 @@ class PublishItemSchema(Schema):
     media_id: int
     original_filename: str
     mime_type: str
+    cloudinary_url: Optional[str] = None
     proxy_url: str
     event_name: str
     city_name: str
@@ -457,6 +467,7 @@ def publish_queue(request):
             media_id=media.id,
             original_filename=media.original_filename,
             mime_type=media.mime_type,
+            cloudinary_url=media.cloudinary_url or None,
             proxy_url=f"/api/media/proxy/{version.drive_file_id}",
             event_name=event.name,
             city_name=str(city),

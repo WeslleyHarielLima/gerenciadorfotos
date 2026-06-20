@@ -76,15 +76,27 @@ export default function CitiesPage() {
               <Link
                 key={task.task_id}
                 href={activeTaskLink(task)}
-                className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100 transition-colors"
+                className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100 transition-colors"
               >
-                <div className="min-w-0">
+                {/* Thumbnail */}
+                {task.cloudinary_url ? (
+                  <img
+                    src={task.cloudinary_url}
+                    alt={task.filename}
+                    className="w-10 h-10 rounded object-cover flex-shrink-0 bg-gray-100"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-300 text-base">
+                    🖼
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">{task.filename}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {task.event_name} · {task.city_name}
                   </p>
                 </div>
-                <span className="ml-4 shrink-0 text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
+                <span className="ml-2 shrink-0 text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
                   {ROLE_LABELS[task.role_type] ?? task.role_type}
                 </span>
               </Link>

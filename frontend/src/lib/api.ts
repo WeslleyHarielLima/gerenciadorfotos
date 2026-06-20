@@ -41,6 +41,19 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
   return res;
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== "object") return fallback;
+  const detail = (err as Record<string, unknown>).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail
+      .map((d) => (typeof d === "object" && d !== null ? (d as Record<string, unknown>).msg : null))
+      .filter(Boolean);
+    return msgs.length > 0 ? (msgs as string[]).join("; ") : fallback;
+  }
+  return fallback;
+}
+
 export const ApiClient = {
   async login(username: string, password: string): Promise<AuthResponse> {
     const res = await fetch(`${BASE}/auth/login`, {
@@ -50,7 +63,7 @@ export const ApiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Credenciais inválidas.");
+      throw new Error(extractErrorMessage(err, "Credenciais inválidas."));
     }
     const data: AuthResponse = await res.json();
     saveAuth(data);
@@ -93,7 +106,7 @@ export const ApiClient = {
       const res = await apiFetch("/media/upload", { method: "POST", body: form });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { detail?: string }).detail ?? "Falha no upload.");
+        throw new Error(extractErrorMessage(err, "Falha no upload."));
       }
       const data: UploadResponse = await res.json();
       allResults.push(...data.results);
@@ -118,7 +131,7 @@ export const ApiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha no download.");
+      throw new Error(extractErrorMessage(err, "Falha no download."));
     }
     return res.blob();
   },
@@ -129,7 +142,7 @@ export const ApiClient = {
     const res = await apiFetch("/media/upload-edited", { method: "POST", body: form });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha no upload editado.");
+      throw new Error(extractErrorMessage(err, "Falha no upload editado."));
     }
     return res.json();
   },
@@ -146,7 +159,7 @@ export const ApiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha ao abandonar tarefa.");
+      throw new Error(extractErrorMessage(err, "Falha ao abandonar tarefa."));
     }
   },
 
@@ -160,7 +173,7 @@ export const ApiClient = {
     const res = await apiFetch(`/tasks/${taskId}/approve`, { method: "POST" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha ao aprovar.");
+      throw new Error(extractErrorMessage(err, "Falha ao aprovar."));
     }
   },
 
@@ -172,7 +185,7 @@ export const ApiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha ao rejeitar.");
+      throw new Error(extractErrorMessage(err, "Falha ao rejeitar."));
     }
   },
 
@@ -184,7 +197,7 @@ export const ApiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha ao rejeitar definitivamente.");
+      throw new Error(extractErrorMessage(err, "Falha ao rejeitar definitivamente."));
     }
   },
 
@@ -198,7 +211,7 @@ export const ApiClient = {
     const res = await apiFetch(`/tasks/${taskId}/publish`, { method: "POST" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail ?? "Falha ao publicar.");
+      throw new Error(extractErrorMessage(err, "Falha ao publicar."));
     }
   },
 

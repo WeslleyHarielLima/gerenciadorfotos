@@ -68,6 +68,8 @@ class Media(models.Model):
         "User", on_delete=models.PROTECT, related_name="uploaded_media"
     )
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="uploaded")
+    cloudinary_url = models.URLField(max_length=1000, blank=True)
+    cloudinary_public_id = models.CharField(max_length=300, blank=True)
     last_status_change = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -102,6 +104,8 @@ class MediaVersion(models.Model):
     edited_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="original")
     file_size = models.BigIntegerField()
+    cloudinary_url = models.URLField(max_length=1000, blank=True)
+    cloudinary_public_id = models.CharField(max_length=300, blank=True)
 
     class Meta:
         verbose_name = "Versão de Mídia"

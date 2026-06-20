@@ -62,6 +62,7 @@ class ActiveTaskOut(Schema):
     role_type: str
     media_id: int
     filename: str
+    cloudinary_url: str | None = None
     event_id: int
     event_name: str
     city_id: int
@@ -88,6 +89,7 @@ def active_tasks(request):
             role_type=t.role_type,
             media_id=media.id,
             filename=media.original_filename,
+            cloudinary_url=media.cloudinary_url or None,
             event_id=event.id,
             event_name=event.name,
             city_id=event.city.id,
