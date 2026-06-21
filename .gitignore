@@ -12,6 +12,8 @@ docs/weighty-skyline-*.json
 # OAuth2 client secrets e token de usuário (NUNCA versionar)
 docs/oauth_client.json
 docs/drive_token.json
+docs/calendar_token.json
+docs/*_token.json
 # dump do console GCP — pode conter chave privada
 docs/google.md
 
