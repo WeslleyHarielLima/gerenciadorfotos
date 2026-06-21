@@ -131,13 +131,16 @@ export default function EditorKanbanPage() {
     }
   }
 
-  async function handleUploadEdited(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  async function handleUploadEdited(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    // Snapshot dos arquivos ANTES de limpar o input: zerar uploadRef.value
+    // esvazia o FileList vivo, então Array.from precisa rodar primeiro.
+    const files = Array.from(fileList);
     if (uploadRef.current) uploadRef.current.value = "";
     setUploading(true);
     setUploadResults([]);
     try {
-      const data = await ApiClient.uploadEdited(Array.from(files));
+      const data = await ApiClient.uploadEdited(files);
       setUploadResults(data.results);
       loadBoard();
     } catch (e: unknown) {
