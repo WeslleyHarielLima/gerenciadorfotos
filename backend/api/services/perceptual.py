@@ -32,6 +32,16 @@ def compute(data: bytes) -> Optional[int]:
         return None
 
 
+def to_hex(h: Optional[int]) -> Optional[str]:
+    """Serializa o hash de 256 bits como string hex de 64 chars (cabe em CharField)."""
+    return format(h, "064x") if h is not None else None
+
+
+def from_hex(s: Optional[str]) -> Optional[int]:
+    """Desserializa o hash hex de volta para int (para cálculo de distância)."""
+    return int(s, 16) if s else None
+
+
 def distance(h1: int, h2: int) -> int:
     """Distância de Hamming entre dois hashes (bits diferentes)."""
     return bin(h1 ^ h2).count("1")
