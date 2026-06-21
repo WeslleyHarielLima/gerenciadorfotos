@@ -71,12 +71,13 @@ export default function EditorKanbanPage() {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
 
-  // Upload editado
+  // Envio individual: uma foto editada por tarefa
   const uploadRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadEditedResultItem[]>([]);
-  // Confirmação antes de enviar: preview da(s) editada(s) selecionada(s)
-  const [pendingUpload, setPendingUpload] = useState<{ file: File; previewUrl: string }[] | null>(null);
+  // Tarefa-alvo do envio e a foto editada escolhida (preview antes de confirmar)
+  const [sendTarget, setSendTarget] = useState<TaskItem | null>(null);
+  const [sendFile, setSendFile] = useState<{ file: File; previewUrl: string } | null>(null);
 
   // Desistência modal
   const [abandonTarget, setAbandonTarget] = useState<TaskItem | null>(null);
@@ -99,7 +100,7 @@ export default function EditorKanbanPage() {
   }, [eventId]);
 
   // Mantém o board atualizado (silencioso; pausa durante upload/download)
-  useAutoRefresh(() => { if (eventId) loadBoard(true); }, { enabled: !uploading && !downloading && !pendingUpload });
+  useAutoRefresh(() => { if (eventId) loadBoard(true); }, { enabled: !sending && !downloading && !sendFile });
 
   function toggleSelect(id: number) {
     setSelected((prev) => {
@@ -140,34 +141,39 @@ export default function EditorKanbanPage() {
     }
   }
 
-  // Seleção de arquivos → abre o preview/confirmação (NÃO envia ainda).
-  function handleUploadEdited(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return;
-    // Snapshot dos arquivos ANTES de limpar o input: zerar uploadRef.value
-    // esvazia o FileList vivo, então Array.from precisa rodar primeiro.
-    const files = Array.from(fileList);
-    if (uploadRef.current) uploadRef.current.value = "";
+  // Clicou em "Enviar" no card → guarda a tarefa-alvo e abre o seletor de arquivo.
+  function startSend(task: TaskItem) {
+    setSendTarget(task);
     setUploadResults([]);
-    setPendingUpload(files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })));
+    uploadRef.current?.click();
   }
 
-  function cancelUpload() {
-    pendingUpload?.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-    setPendingUpload(null);
+  // Escolheu o arquivo editado → abre o preview/confirmação (NÃO envia ainda).
+  function handleFileChosen(fileList: FileList | null) {
+    const file = fileList?.[0];
+    // Zerar uploadRef.value esvazia o FileList vivo, então leia o arquivo antes.
+    if (uploadRef.current) uploadRef.current.value = "";
+    if (!file) return;
+    setSendFile({ file, previewUrl: URL.createObjectURL(file) });
   }
 
-  // Confirmação → envia de fato as editadas selecionadas.
-  async function confirmUpload() {
-    if (!pendingUpload || pendingUpload.length === 0) return;
-    const files = pendingUpload.map((p) => p.file);
-    setUploading(true);
+  function cancelSend() {
+    if (sendFile) URL.revokeObjectURL(sendFile.previewUrl);
+    setSendFile(null);
+    setSendTarget(null);
+  }
+
+  // Confirmação → envia a foto editada da tarefa-alvo, individualmente.
+  async function confirmSend() {
+    if (!sendFile) return;
+    setSending(true);
     try {
-      const data = await ApiClient.uploadEdited(files);
+      const data = await ApiClient.uploadEdited([sendFile.file]);
       setUploadResults(data.results);
       loadBoard();
     } catch (e: unknown) {
       setUploadResults([{
-        filename: "—",
+        filename: sendFile.file.name,
         success: false,
         media_version_id: null,
         fraud_detected: false,
@@ -175,8 +181,8 @@ export default function EditorKanbanPage() {
         error: e instanceof Error ? e.message : "Erro no upload.",
       }]);
     } finally {
-      setUploading(false);
-      cancelUpload();
+      setSending(false);
+      cancelSend();
     }
   }
 
@@ -294,24 +300,14 @@ export default function EditorKanbanPage() {
                     {board.editing.length}
                   </span>
                 </h3>
-                <button
-                  onClick={() => uploadRef.current?.click()}
-                  disabled={board.editing.length === 0 || uploading}
-                  className="ds-btn ds-btn-brand"
-                  style={{ padding: "5px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
-                >
-                  <Ico d={IC.upload} size={13} />
-                  {uploading ? "Enviando..." : "Enviar editadas"}
-                </button>
               </div>
 
               <input
                 ref={uploadRef}
                 type="file"
-                multiple
                 accept="image/*,video/*"
                 className="hidden"
-                onChange={(e) => handleUploadEdited(e.target.files)}
+                onChange={(e) => handleFileChosen(e.target.files)}
               />
 
               {uploadResults.length > 0 && (
@@ -369,8 +365,17 @@ export default function EditorKanbanPage() {
                         <p className="ds-text-secondary" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{t.feedback}</p>
                       </div>
                     )}
-                    {/* Ação separada */}
-                    <div className="px-3 pb-2">
+                    {/* Ações da tarefa — envio individual desta foto */}
+                    <div className="px-3 pb-2 flex items-center justify-between gap-3">
+                      <button
+                        onClick={() => startSend(t)}
+                        disabled={sending}
+                        className="ds-btn ds-btn-brand"
+                        style={{ padding: "5px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Ico d={IC.upload} size={13} />
+                        Enviar
+                      </button>
                       <button
                         onClick={() => {
                           setAbandonTarget(t);
@@ -425,59 +430,52 @@ export default function EditorKanbanPage() {
           </div>
         )}
 
-        {/* ── Modal de confirmação de envio das editadas ── */}
-        {pendingUpload && (
+        {/* ── Modal de confirmação de envio (uma foto / uma tarefa) ── */}
+        {sendFile && sendTarget && (
           <div className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.6)" }}>
             <div className="ds-card-emphasis rounded-2xl w-full max-w-3xl my-8" style={{ padding: 0 }}>
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <h4 className="ds-title" style={{ fontSize: 17 }}>
-                  Confirmar envio {pendingUpload.length > 1 ? `(${pendingUpload.length} arquivos)` : ""}
-                </h4>
-                <button onClick={cancelUpload} disabled={uploading} className="ds-text-muted ds-hover flex items-center justify-center rounded" style={{ width: 32, height: 32 }} aria-label="Fechar">
+                <h4 className="ds-title" style={{ fontSize: 17 }}>Confirmar envio</h4>
+                <button onClick={cancelSend} disabled={sending} className="ds-text-muted ds-hover flex items-center justify-center rounded" style={{ width: 32, height: 32 }} aria-label="Fechar">
                   <Ico d={IC.close} size={18} />
                 </button>
               </div>
 
               <p className="ds-text-muted px-6 pt-4" style={{ fontSize: 13 }}>
-                Confira a foto editada antes de enviar para revisão do curador. O original (quando identificado pelo nome) aparece ao lado para comparação.
+                Confira a foto editada antes de enviar para revisão do curador. O original aparece ao lado para comparação.
               </p>
 
-              <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                {pendingUpload.map(({ file, previewUrl }, i) => {
-                  const match = board?.editing.find((t) => t.original_filename === file.name);
-                  return (
-                    <div key={i} className="ds-card rounded-lg p-4">
-                      <p className="ds-text-primary truncate mb-1" style={{ fontSize: 13, fontWeight: 600 }}>{file.name}</p>
-                      <p className="ds-text-muted mb-3" style={{ fontSize: 12 }}>{file.type || "image"} · {formatSize(file.size)}</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="ds-eyebrow mb-2">Original</p>
-                          {match?.cloudinary_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={match.cloudinary_url} alt="Original" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
-                          ) : (
-                            <div className="w-full rounded-lg flex items-center justify-center ds-text-muted" style={{ height: 160, background: "var(--bg-card-muted)", border: "1px solid var(--border-subtle)", fontSize: 12, textAlign: "center", padding: 12 }}>
-                              {match ? "Sem prévia do original" : "Original não identificado pelo nome do arquivo"}
-                            </div>
-                          )}
+              <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+                <div className="ds-card rounded-lg p-4">
+                  <p className="ds-text-primary truncate mb-1" style={{ fontSize: 13, fontWeight: 600 }}>{sendTarget.original_filename}</p>
+                  <p className="ds-text-muted mb-3" style={{ fontSize: 12 }}>{sendFile.file.type || "image"} · {formatSize(sendFile.file.size)}</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="ds-eyebrow mb-2">Original</p>
+                      {sendTarget.cloudinary_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={sendTarget.cloudinary_url} alt="Original" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
+                      ) : (
+                        <div className="w-full rounded-lg flex items-center justify-center ds-text-muted" style={{ height: 160, background: "var(--bg-card-muted)", border: "1px solid var(--border-subtle)", fontSize: 12, textAlign: "center", padding: 12 }}>
+                          Sem prévia do original
                         </div>
-                        <div>
-                          <p className="ds-eyebrow mb-2">Editada (a enviar)</p>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={previewUrl} alt="Editada" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
+                    <div>
+                      <p className="ds-eyebrow mb-2">Editada (a enviar)</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={sendFile.previewUrl} alt="Editada" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                <button onClick={cancelUpload} disabled={uploading} className="ds-btn ds-btn-ghost flex-1" style={{ padding: "9px 16px", justifyContent: "center" }}>
+                <button onClick={cancelSend} disabled={sending} className="ds-btn ds-btn-ghost flex-1" style={{ padding: "9px 16px", justifyContent: "center" }}>
                   Cancelar
                 </button>
-                <button onClick={confirmUpload} disabled={uploading} className="ds-btn ds-btn-brand flex-1" style={{ padding: "9px 16px", justifyContent: "center", gap: 6 }}>
-                  {uploading ? "Enviando..." : (<><Ico d={IC.upload} size={15} /> Confirmar e enviar</>)}
+                <button onClick={confirmSend} disabled={sending} className="ds-btn ds-btn-brand flex-1" style={{ padding: "9px 16px", justifyContent: "center", gap: 6 }}>
+                  {sending ? "Enviando..." : (<><Ico d={IC.upload} size={15} /> Confirmar e enviar</>)}
                 </button>
               </div>
             </div>
