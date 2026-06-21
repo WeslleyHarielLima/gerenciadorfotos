@@ -8,6 +8,7 @@ import { EditorBoard, MediaItem, TaskItem, UploadEditedResultItem } from "@/lib/
 import PhotoDrawer from "@/components/PhotoDrawer";
 import PhotoLightbox from "@/components/PhotoLightbox";
 import { IC, Ico } from "@/components/icons";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 const REASON_OPTIONS = [
   { value: "technical_issue", label: "Problema técnico" },
@@ -75,18 +76,21 @@ export default function EditorKanbanPage() {
   const [abandoning, setAbandoning] = useState(false);
   const [abandonError, setAbandonError] = useState("");
 
-  function loadBoard() {
-    setLoading(true);
+  function loadBoard(silent = false) {
+    if (!silent) setLoading(true);
     ApiClient.getEditorBoard(eventId)
       .then(setBoard)
       .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }
 
   useEffect(() => {
     if (eventId) loadBoard();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  // Mantém o board atualizado (silencioso; pausa durante upload/download)
+  useAutoRefresh(() => { if (eventId) loadBoard(true); }, { enabled: !uploading && !downloading });
 
   function toggleSelect(id: number) {
     setSelected((prev) => {

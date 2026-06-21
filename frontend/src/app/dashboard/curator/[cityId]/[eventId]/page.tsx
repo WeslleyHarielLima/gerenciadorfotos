@@ -8,6 +8,7 @@ import { ReviewItem, VersionHistoryItem } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
 import { IC, Ico } from "@/components/icons";
 import PhotoLightbox from "@/components/PhotoLightbox";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -135,17 +136,20 @@ export default function CuratorKanbanPage() {
   // Lightbox de comparação em tela cheia (0 = original, 1 = editada)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const loadQueue = useCallback(() => {
-    setPageLoading(true);
+  const loadQueue = useCallback((silent = false) => {
+    if (!silent) setPageLoading(true);
     ApiClient.getReviewQueue()
       .then((data) => setItems(data.items))
       .catch((e: Error) => setPageError(e.message))
-      .finally(() => setPageLoading(false));
+      .finally(() => { if (!silent) setPageLoading(false); });
   }, []);
 
   useEffect(() => {
     loadQueue();
   }, [loadQueue]);
+
+  // Atualiza a fila automaticamente (silencioso; pausa com modal de revisão aberto)
+  useAutoRefresh(() => loadQueue(true), { enabled: !modal });
 
   function openModal(item: ReviewItem) {
     setModal({ item, mode: null, feedback: "", loading: false, error: "", confirmFinal: false });
@@ -219,7 +223,7 @@ export default function CuratorKanbanPage() {
           )}
         </h2>
         <button
-          onClick={loadQueue}
+          onClick={() => loadQueue()}
           className="ds-btn ds-btn-ghost"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px" }}
         >

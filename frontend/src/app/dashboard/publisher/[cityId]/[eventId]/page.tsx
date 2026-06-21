@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
 import { PublishHistoryGroup, PublishItem } from "@/lib/types";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -45,28 +46,34 @@ export default function PublisherKanbanPage() {
 
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
-  const loadQueue = useCallback(() => {
-    setLoading(true);
+  const loadQueue = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setPageError("");
     ApiClient.getPublishQueue()
       .then((data) => setQueue(data.items))
       .catch((e: Error) => setPageError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }, []);
 
-  const loadHistory = useCallback(() => {
-    setLoading(true);
+  const loadHistory = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setPageError("");
     ApiClient.getPublishHistory()
       .then((data) => setHistoryGroups(data.groups))
       .catch((e: Error) => setPageError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }, []);
 
   useEffect(() => {
     if (tab === "queue") loadQueue();
     else loadHistory();
   }, [tab, loadQueue, loadHistory]);
+
+  // Auto-refresh silencioso do tab ativo (pausa com o modal de confirmação aberto)
+  useAutoRefresh(
+    () => { if (tab === "queue") loadQueue(true); else loadHistory(true); },
+    { enabled: !confirm },
+  );
 
   async function handlePublish() {
     if (!confirm) return;
