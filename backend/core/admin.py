@@ -78,11 +78,24 @@ class MediaVersionAdmin(ModelAdmin):
 
 @admin.register(Task)
 class TaskAdmin(ModelAdmin):
-    list_display = ("id", "media_version", "assigned_to", "role_type", "status", "created_at")
+    list_display = ("id", "media_version", "assigned_to", "role_type", "status", "parent_task", "iterations", "created_at")
     list_filter = ("role_type", "status")
     search_fields = ("assigned_to__username", "media_version__media__original_filename")
     ordering = ("-created_at",)
+    raw_id_fields = ("parent_task",)
     readonly_fields = ("created_at", "updated_at", "deleted_at", "deleted_by")
+
+    @admin.display(description="Iterações")
+    def iterations(self, obj):
+        """Profundidade da cadeia pai/filho — nº de tentativas até esta task."""
+        depth = 1
+        seen = {obj.pk}
+        node = obj.parent_task
+        while node and node.pk not in seen:
+            seen.add(node.pk)
+            depth += 1
+            node = node.parent_task
+        return depth
 
 
 @admin.register(TaskHistory)

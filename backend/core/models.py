@@ -158,6 +158,19 @@ class Task(models.Model):
         null=True,
         blank=True,
     )
+    parent_task = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="child_tasks",
+        null=True,
+        blank=True,
+        help_text="Task anterior que originou esta (cadeia de iterações após rejeição com retorno).",
+    )
+    perceptual_hash = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="dHash 256-bit da versão original (identificação visual sem EXIF)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

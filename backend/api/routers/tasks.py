@@ -336,19 +336,25 @@ def reject_with_return(request, task_id: int, payload: CuratorDecisionRequest):
         feedback=payload.feedback.strip(),
     )
 
-    # Reabrir task do editor (última task completed do editor para essa mídia)
+    # Criar nova task do editor (cadeia pai/filho): a task rejeitada vira parent,
+    # permitindo rastrear original → rejeição V1 → nova tentativa V2 → aprovação.
     original_version = media.versions.filter(status="original").first()
     if original_version:
-        editor_task = Task.objects.filter(
+        previous_editor_task = Task.objects.filter(
             media_version=original_version,
             role_type="editor",
             status="completed",
         ).order_by("-updated_at").first()
 
-        if editor_task:
-            editor_task.status = "in_progress"
-            editor_task.feedback = payload.feedback.strip()
-            editor_task.save(update_fields=["status", "feedback", "updated_at"])
+        if previous_editor_task:
+            Task.objects.create(
+                media_version=original_version,
+                assigned_to=previous_editor_task.assigned_to,
+                role_type="editor",
+                status="in_progress",
+                feedback=payload.feedback.strip(),
+                parent_task=previous_editor_task,
+            )
 
     return {"detail": "Mídia devolvida ao editor para correção."}
 
