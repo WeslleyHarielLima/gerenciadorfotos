@@ -169,6 +169,31 @@ def event_upload_stats(request, event_id: int):
     return EventUploadStats(total=qs.count(), in_pool=qs.filter(status="uploaded").count())
 
 
+class EventMediaItem(Schema):
+    id: int
+    original_filename: str
+    mime_type: str
+    status: str
+    cloudinary_url: str | None = None
+
+
+@router.get("/event/{event_id}/list", response=List[EventMediaItem])
+@require_role("uploader", "admin")
+def event_media_list(request, event_id: int):
+    """Lista as mídias já enviadas no evento (para o uploader conferir/preview)."""
+    event = get_object_or_404(Event, id=event_id)
+    return [
+        EventMediaItem(
+            id=m.id,
+            original_filename=m.original_filename,
+            mime_type=m.mime_type,
+            status=m.status,
+            cloudinary_url=m.cloudinary_url or None,
+        )
+        for m in Media.objects.filter(event=event).order_by("-created_at")
+    ]
+
+
 class DownloadBatchRequest(Schema):
     media_ids: List[int]
 
