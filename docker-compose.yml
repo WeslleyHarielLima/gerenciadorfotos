@@ -93,7 +93,7 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # ── Sync com Google Calendar (a cada hora) ────────────────────────────────
+  # ── Sync com Google Calendar (a cada 60s — quase imediato) ────────────────
   calendar_sync:
     build:
       context: ./backend
@@ -101,10 +101,10 @@ services:
     container_name: workflow_calendar_sync
     command: >
       sh -c "
-        echo 'calendar_sync iniciado — ciclo a cada 3600s';
+        echo 'calendar_sync iniciado — ciclo a cada 60s';
         while true; do
           python scripts/calendar_sync.py;
-          sleep 3600;
+          sleep 60;
         done
       "
     env_file: .env

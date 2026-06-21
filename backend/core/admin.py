@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.shortcuts import redirect
 from django.utils import timezone
 from unfold.admin import ModelAdmin
+from unfold.decorators import action
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from core.models import (
@@ -35,6 +37,28 @@ class EventAdmin(ModelAdmin):
     ordering = ("-event_date",)
     readonly_fields = ("google_calendar_event_id", "google_drive_folder_id", "created_at", "updated_at")
     actions = ["reprocess_pending_validation"]
+    actions_list = ["sync_calendar_now"]
+
+    @action(description="Sincronizar Calendar agora", url_path="sync-calendar-now")
+    def sync_calendar_now(self, request):
+        """Botão no topo da lista: roda o calendar_sync na hora, sem esperar o ciclo."""
+        from scripts.calendar_sync import run
+
+        try:
+            result = run()
+        except Exception as exc:
+            self.message_user(request, f"Falha ao sincronizar: {exc}", level="error")
+        else:
+            if result.get("status") == "failed":
+                self.message_user(request, f"Sync falhou: {result}", level="error")
+            else:
+                self.message_user(
+                    request,
+                    f"Sincronizado: {result.get('processed', 0)} processado(s), "
+                    f"{result.get('failed', 0)} falha(s).",
+                    level="success" if result.get("status") == "success" else "warning",
+                )
+        return redirect(request.META.get("HTTP_REFERER") or "admin:core_event_changelist")
 
     @admin.action(description="Reprocessar eventos pendentes de validação")
     def reprocess_pending_validation(self, request, queryset):
