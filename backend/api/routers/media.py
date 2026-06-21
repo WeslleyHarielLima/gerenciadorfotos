@@ -194,7 +194,7 @@ def event_media_list(request, event_id: int):
     ]
 
 
-@router.delete("/{media_id}")
+@router.delete("/{int:media_id}")
 @require_role("uploader", "admin")
 def delete_media(request, media_id: int):
     """Remove uma mídia que o uploader enviou, enquanto ainda está no pool.
@@ -285,8 +285,8 @@ def download_batch(request, payload: DownloadBatchRequest):
             from api.services.watermark import embed_watermark
             data = embed_watermark(data, media.id, media.mime_type)
 
-            from api.services.perceptual import compute as phash_compute
-            perceptual_hash = phash_compute(data)
+            from api.services.perceptual import compute as phash_compute, to_hex as phash_to_hex
+            perceptual_hash = phash_to_hex(phash_compute(data))
 
             zf.writestr(media.original_filename, data)
 
@@ -393,7 +393,7 @@ def upload_edited(
 
             if task is None:
                 # Fallback 2: hash perceptual (sobrevive recompressão JPEG e renomeação)
-                from api.services.perceptual import compute as phash_compute, distance as phash_distance, MATCH_THRESHOLD
+                from api.services.perceptual import compute as phash_compute, distance as phash_distance, from_hex as phash_from_hex, MATCH_THRESHOLD
                 upload_hash = phash_compute(data)
 
                 if upload_hash is not None:
@@ -406,7 +406,7 @@ def upload_edited(
                     best_task = None
                     best_dist = MATCH_THRESHOLD + 1
                     for candidate in active_tasks:
-                        dist = phash_distance(upload_hash, candidate.perceptual_hash)
+                        dist = phash_distance(upload_hash, phash_from_hex(candidate.perceptual_hash))
                         if dist < best_dist:
                             best_dist = dist
                             best_task = candidate
@@ -539,7 +539,7 @@ class MediaDetailSchema(Schema):
     versions: List[MediaVersionDetail]
 
 
-@router.get("/{media_id}/detail", response=MediaDetailSchema)
+@router.get("/{int:media_id}/detail", response=MediaDetailSchema)
 def media_detail(request, media_id: int):
     """Retorna metadados completos e histórico de versões de uma mídia."""
     if not request.auth:

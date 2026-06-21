@@ -166,10 +166,11 @@ class Task(models.Model):
         blank=True,
         help_text="Task anterior que originou esta (cadeia de iterações após rejeição com retorno).",
     )
-    perceptual_hash = models.BigIntegerField(
+    perceptual_hash = models.CharField(
+        max_length=64,
         null=True,
         blank=True,
-        help_text="dHash 256-bit da versão original (identificação visual sem EXIF)",
+        help_text="dHash 256-bit (hex, 64 chars) da versão original (identificação visual sem EXIF)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
