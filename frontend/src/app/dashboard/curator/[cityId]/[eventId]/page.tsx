@@ -133,6 +133,9 @@ export default function CuratorKanbanPage() {
 
   const [modal, setModal] = useState<ReviewModal | null>(null);
 
+  // Confirmação da última decisão (sinalização para o curador)
+  const [flash, setFlash] = useState("");
+
   // Lightbox de comparação em tela cheia (0 = original, 1 = editada)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -150,6 +153,13 @@ export default function CuratorKanbanPage() {
 
   // Atualiza a fila automaticamente (silencioso; pausa com modal de revisão aberto)
   useAutoRefresh(() => loadQueue(true), { enabled: !modal });
+
+  // Some com a confirmação após alguns segundos
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(""), 5000);
+    return () => clearTimeout(id);
+  }, [flash]);
 
   function openModal(item: ReviewItem) {
     setModal({ item, mode: null, feedback: "", loading: false, error: "", confirmFinal: false });
@@ -176,14 +186,19 @@ export default function CuratorKanbanPage() {
     setModal((m) => m && { ...m, loading: true, error: "" });
 
     try {
+      let message = "";
       if (mode === "approve") {
         await ApiClient.approveTask(item.task_id);
+        message = `“${item.original_filename}” aprovada e enviada ao publicador.`;
       } else if (mode === "reject-return") {
         await ApiClient.rejectWithReturn(item.task_id, feedback.trim());
+        message = `“${item.original_filename}” devolvida ao editor para correção.`;
       } else if (mode === "reject-final") {
         await ApiClient.rejectFinal(item.task_id, feedback.trim());
+        message = `“${item.original_filename}” rejeitada definitivamente.`;
       }
       closeModal();
+      setFlash(message);
       loadQueue();
     } catch (e: unknown) {
       setModal((m) =>
@@ -230,6 +245,10 @@ export default function CuratorKanbanPage() {
           <Ico d={IC.review} size={14} /> Atualizar
         </button>
       </div>
+
+      {flash && (
+        <p className="ds-alert ds-alert-success" style={{ marginBottom: 16 }}>{flash}</p>
+      )}
 
       {pageLoading && <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>}
       {pageError && <p className="ds-alert ds-alert-danger">{pageError}</p>}

@@ -78,6 +78,8 @@ export interface TaskItem {
   file_size: number;
   status: string;
   cloudinary_url?: string | null;
+  feedback?: string;
+  is_revision?: boolean;
 }
 
 export interface EditorBoard {

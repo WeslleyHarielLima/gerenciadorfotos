@@ -10,6 +10,13 @@ import PhotoLightbox from "@/components/PhotoLightbox";
 import { IC, Ico } from "@/components/icons";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
+// Badge da coluna "Enviadas" conforme o status real da mídia.
+const SENT_BADGE: Record<string, { label: string; cls: string }> = {
+  pending_review: { label: "aguardando revisão", cls: "ds-badge-success" },
+  approved: { label: "aprovada", cls: "ds-badge-success" },
+  published: { label: "publicada", cls: "ds-badge-neutral" },
+};
+
 const REASON_OPTIONS = [
   { value: "technical_issue", label: "Problema técnico" },
   { value: "wrong_file", label: "Arquivo errado" },
@@ -318,7 +325,7 @@ export default function EditorKanbanPage() {
                   <div
                     key={t.task_id}
                     className="ds-card rounded-lg overflow-hidden"
-                    style={{ borderLeft: "3px solid var(--state-warning)" }}
+                    style={{ borderLeft: `3px solid ${t.is_revision ? "var(--state-danger)" : "var(--state-warning)"}` }}
                   >
                     {/* Área clicável para abrir drawer */}
                     <button
@@ -329,8 +336,23 @@ export default function EditorKanbanPage() {
                       <div className="min-w-0 flex-1">
                         <p className="ds-text-primary truncate" style={{ fontSize: 13, fontWeight: 600 }}>{t.original_filename}</p>
                         <p className="ds-text-muted" style={{ fontSize: 12 }}>{t.mime_type} · {formatSize(t.file_size)}</p>
+                        {t.is_revision && (
+                          <span className="ds-badge ds-badge-danger" style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Ico d={IC.arrow} size={11} /> Devolvida para correção
+                          </span>
+                        )}
                       </div>
                     </button>
+                    {/* Motivo da devolução pelo curador */}
+                    {t.is_revision && t.feedback && (
+                      <div
+                        className="mx-3 mb-2 px-3 py-2 rounded"
+                        style={{ background: "var(--bg-card-muted)", borderLeft: "2px solid var(--state-danger)" }}
+                      >
+                        <p className="ds-eyebrow" style={{ marginBottom: 2 }}>Motivo da rejeição</p>
+                        <p className="ds-text-secondary" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{t.feedback}</p>
+                      </div>
+                    )}
                     {/* Ação separada */}
                     <div className="px-3 pb-2">
                       <button
@@ -376,7 +398,9 @@ export default function EditorKanbanPage() {
                     <div className="min-w-0 flex-1">
                       <p className="ds-text-primary truncate" style={{ fontSize: 13, fontWeight: 600 }}>{t.original_filename}</p>
                       <p className="ds-text-muted" style={{ fontSize: 12 }}>{t.mime_type} · {formatSize(t.file_size)}</p>
-                      <span className="ds-badge ds-badge-success" style={{ marginTop: 4 }}>aguardando revisão</span>
+                      <span className={`ds-badge ${SENT_BADGE[t.status]?.cls ?? "ds-badge-success"}`} style={{ marginTop: 4 }}>
+                        {SENT_BADGE[t.status]?.label ?? "aguardando revisão"}
+                      </span>
                     </div>
                   </button>
                 ))}

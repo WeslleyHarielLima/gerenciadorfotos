@@ -30,6 +30,8 @@ class TaskItemSchema(Schema):
     file_size: int
     status: str
     cloudinary_url: Optional[str] = None
+    feedback: str = ""
+    is_revision: bool = False
 
 
 class EditorBoardSchema(Schema):
@@ -76,28 +78,46 @@ def editor_board(request, event_id: int):
             file_size=t.media_version.media.file_size,
             status=t.media_version.media.status,
             cloudinary_url=t.media_version.media.cloudinary_url or None,
+            # Tasks devolvidas pelo curador carregam o motivo e têm parent_task.
+            feedback=t.feedback,
+            is_revision=t.parent_task_id is not None,
         )
         for t in editing_tasks
     ]
 
-    sent_tasks = Task.objects.select_related("media_version__media").filter(
+    # "Enviadas": submissões que ainda valem — aguardando revisão, aprovadas ou
+    # publicadas. Uma submissão rejeitada faz a mídia voltar para selected_for_edit
+    # (e reabre uma task de edição), então a task completed antiga fica obsoleta e
+    # NÃO deve aparecer aqui. Como todas as tentativas compartilham a media_version
+    # original, deduplicamos por mídia mantendo a submissão mais recente.
+    SENT_STATUSES = ("pending_review", "approved", "published")
+    completed_tasks = Task.objects.select_related("media_version__media").filter(
         assigned_to=editor,
         role_type="editor",
         status="completed",
         media_version__media__event=event,
-    )
-    sent = [
-        TaskItemSchema(
-            task_id=t.id,
-            media_id=t.media_version.media.id,
-            original_filename=t.media_version.media.original_filename,
-            mime_type=t.media_version.media.mime_type,
-            file_size=t.media_version.media.file_size,
-            status=t.media_version.media.status,
-            cloudinary_url=t.media_version.media.cloudinary_url or None,
+    ).order_by("media_version__media_id", "-updated_at")
+
+    sent: List[TaskItemSchema] = []
+    seen_media: set[int] = set()
+    for t in completed_tasks:
+        media = t.media_version.media
+        if media.id in seen_media:
+            continue
+        seen_media.add(media.id)
+        if media.status not in SENT_STATUSES:
+            continue
+        sent.append(
+            TaskItemSchema(
+                task_id=t.id,
+                media_id=media.id,
+                original_filename=media.original_filename,
+                mime_type=media.mime_type,
+                file_size=media.file_size,
+                status=media.status,
+                cloudinary_url=media.cloudinary_url or None,
+            )
         )
-        for t in sent_tasks
-    ]
 
     return EditorBoardSchema(available=available, editing=editing, sent=sent)
 
