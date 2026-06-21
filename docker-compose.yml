@@ -153,6 +153,36 @@ services:
         max-size: "5m"
         max-file: "3"
 
+  # ── Retry de uploads ao Cloudinary (a cada 10 minutos) ────────────────────
+  cloudinary_retry:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: workflow_cloudinary_retry
+    command: >
+      sh -c "
+        echo 'cloudinary_retry iniciado — ciclo a cada 600s';
+        while true; do
+          python scripts/cloudinary_retry.py;
+          sleep 600;
+        done
+      "
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DJANGO_SETTINGS_MODULE: config.settings
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
   # ── Backup diário (a cada 24 horas) ───────────────────────────────────────
   backup:
     build:

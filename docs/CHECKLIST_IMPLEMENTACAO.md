@@ -22,20 +22,21 @@
 - [x] **Script de retry** `scripts/cloudinary_retry.py`: baixa do Drive → sobe ao Cloudinary
       com backoff, grava URL na Media/MediaVersion, MAX_ATTEMPTS=5, loga em `ScriptExecutionLog`
 - [x] Admin: `PendingCloudinaryUploadAdmin` com alerta de 3+ tentativas
-- [ ] **Operacional:** agendar `cloudinary_retry` no cron (ex.: a cada 5–10 min)
+- [x] **Agendado:** serviço `cloudinary_retry` no `docker-compose.yml` (container worker, ciclo 600s/10min)
 
-### 🔴 Backfill (bloqueado)
-- [ ] Confirmar **credenciais e plano** do Cloudinary (limites de upload/transformação)
-- [ ] Contar registros **em produção** e decidir: backfill em background ou janela de manutenção
+### 🔴 Backfill (plano GRÁTIS — rodar em lotes pequenos, conferindo a cota)
+- [x] Script **pronto**: `scripts/cloudinary_backfill.py` (com `--count`, `--limit N`, `--dry-run`) — **não executado**
+- [ ] **Você:** confirmar que as credenciais do Cloudinary estão no `.env` de produção
+- [ ] **Você:** contar o que falta em produção:
       ```bash
-      cd backend && python manage.py shell -c "
-      from core.models import Media, MediaVersion
-      print('Media total:', Media.objects.count())
-      print('Media sem cloudinary_url:', Media.objects.filter(cloudinary_url='').count())
-      print('MediaVersion sem cloudinary_url:', MediaVersion.objects.filter(cloudinary_url='').count())
-      "
+      cd backend && python -m scripts.cloudinary_backfill --count
       ```
-- [ ] Criar e rodar **script de backfill** (testar em subconjunto antes do volume completo)
+- [ ] **Você:** rodar em lotes, conferindo a cota no painel do Cloudinary entre cada um:
+      ```bash
+      cd backend && python -m scripts.cloudinary_backfill --limit 200 --dry-run   # confere alvos
+      cd backend && python -m scripts.cloudinary_backfill --limit 200             # sobe o lote
+      # repetir até --count chegar a 0
+      ```
 
 ---
 
@@ -83,19 +84,48 @@ assim que sobe. Nenhuma trava sequencial; sem etapa de "finalizar".
 
 ---
 
-## OPERACIONAL / GERAL
-- [ ] Mergear/deployar o commit `b96619d` (Mudança 2 + fix do `perceptual_hash`)
-      — até lá, ambientes no HEAD anterior seguem com o bug do `perceptual_hash`
-- [ ] Toda migration deve ser testada em dev antes de aplicar em produção (regra fixa)
-- [ ] Commit separado por mudança (não agrupar tudo num PR)
+## OPERACIONAL / GERAL — comandos de produção (executar no deploy)
+
+### 1. Deploy
+- [ ] Mergear/deployar a branch `reuniao2` — até lá, ambientes no HEAD anterior
+      seguem com o bug do `perceptual_hash`
+- [ ] Subir o novo worker de retry junto com os demais:
+      ```bash
+      docker compose up -d cloudinary_retry
+      ```
+
+### 2. Migrations (Mudanças 2 e 1) — já testadas em dev
+- [ ] Aplicar em produção:
+      ```bash
+      cd backend && python manage.py migrate
+      # aplica 0010_task_parent_task (Mudança 2) e 0011_pendingcloudinaryupload (Mudança 1)
+      ```
+
+### 3. Verificação de dados (read-only)
+- [ ] **Mudança 4** — confirmar que não há eventos agrupados por (data, cidade):
+      ```bash
+      cd backend && python manage.py shell -c "
+      from core.models import Event
+      from django.db.models import Count
+      print(list(Event.objects.values('event_date','city').annotate(t=Count('id')).filter(t__gt=1)))
+      "
+      # lista vazia [] = ok (idempotência por google_calendar_event_id está correta)
+      ```
+
+### 4. Pendências de produto
+- [ ] Decidir o que fazer com o WIP local em `scripts/calendar_sync.py` (parser de cidade)
+- [ ] (Opcional) Contador de iterações agregado no dashboard admin (Mudança 2)
+
+### Regras fixas
+- [ ] Toda migration testada em dev antes de produção · commit separado por mudança
 
 ---
 
 ## ORDEM SUGERIDA
 1. ~~**Upload parcial**~~ ✅ resolvido (concorrente + contador)
-2. ~~**Cloudinary — retry + backoff**~~ ✅ feito (falta agendar no cron)
-3. **Cloudinary — backfill** (🔴 após credenciais + contagem em prod)
-4. **Verificações em prod** (Mudança 4 + migration da Mudança 2)
+2. ~~**Cloudinary — retry + backoff**~~ ✅ feito (worker agendado no docker-compose)
+3. ~~**Backfill — script**~~ ✅ pronto · **execução em lotes é sua** (plano grátis)
+4. **Deploy:** migrate em prod + verificações (Mudanças 4 e 2)
 
 ---
 
