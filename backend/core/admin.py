@@ -10,6 +10,7 @@ from core.models import (
     Event,
     Media,
     MediaVersion,
+    PendingCloudinaryUpload,
     PendingDriveDeletion,
     ScriptExecutionLog,
     Task,
@@ -131,6 +132,29 @@ class PendingDriveDeletionAdmin(ModelAdmin):
             self.message_user(
                 request,
                 f"⚠ {high_attempts} item(ns) com 3+ tentativas falhas aguardando limpeza.",
+                level="warning",
+            )
+        return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(PendingCloudinaryUpload)
+class PendingCloudinaryUploadAdmin(ModelAdmin):
+    list_display = ("id", "media", "media_version", "attempts", "status", "last_attempt_at", "created_at")
+    list_filter = ("status",)
+    search_fields = ("media__original_filename", "media_version__media__original_filename")
+    ordering = ("-created_at",)
+    readonly_fields = ("media", "media_version", "attempts", "last_attempt_at", "error_message", "created_at")
+
+    def get_list_display_links(self, request, list_display):
+        return ("id",)
+
+    def changelist_view(self, request, extra_context=None):
+        high_attempts = PendingCloudinaryUpload.objects.filter(attempts__gte=3, status="pending").count()
+        extra_context = extra_context or {}
+        if high_attempts:
+            self.message_user(
+                request,
+                f"⚠ {high_attempts} upload(s) ao Cloudinary com 3+ tentativas falhas.",
                 level="warning",
             )
         return super().changelist_view(request, extra_context=extra_context)

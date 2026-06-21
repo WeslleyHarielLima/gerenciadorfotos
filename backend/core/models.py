@@ -240,6 +240,50 @@ class PendingDriveDeletion(models.Model):
         return f"PendingDeletion #{self.pk} [{self.status}] {self.drive_file_id}"
 
 
+class PendingCloudinaryUpload(models.Model):
+    """Fila de retry para uploads ao Cloudinary que falharam no caminho síncrono.
+
+    O caminho inline (request) faz uma tentativa rápida e, se falhar, enfileira aqui.
+    O script `cloudinary_retry` reprocessa offline com backoff: baixa o arquivo do
+    Drive e sobe ao Cloudinary, gravando a URL na Media/MediaVersion alvo.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Pendente"),
+        ("uploaded", "Enviado"),
+        ("failed_max_attempts", "Falha máxima"),
+    ]
+
+    media = models.ForeignKey(
+        "Media",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="pending_cloudinary",
+    )
+    media_version = models.ForeignKey(
+        "MediaVersion",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="pending_cloudinary",
+    )
+    attempts = models.PositiveIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Upload Cloudinary Pendente"
+        verbose_name_plural = "Uploads Cloudinary Pendentes"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        alvo = self.media_version_id and f"version#{self.media_version_id}" or f"media#{self.media_id}"
+        return f"PendingCloudinary #{self.pk} [{self.status}] {alvo}"
+
+
 class ScriptExecutionLog(models.Model):
     STATUS_CHOICES = [
         ("success", "Sucesso"),

@@ -10,7 +10,11 @@ from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
 from api.auth import require_role
-from api.services.cloudinary_service import upload_thumbnail, upload_version_thumbnail
+from api.services.cloudinary_service import (
+    IMAGE_MIME_TYPES,
+    upload_thumbnail,
+    upload_version_thumbnail,
+)
 from api.services.exif import inject_media_id_exif
 from api.services.hash import calculate_sha256
 from core.models import Event, Media, MediaVersion, Task, TaskHistory
@@ -136,6 +140,10 @@ def upload_media(
             media.cloudinary_url = cloudinary_result["url"]
             media.cloudinary_public_id = cloudinary_result["public_id"]
             media.save(update_fields=["cloudinary_url", "cloudinary_public_id"])
+        elif f.content_type in IMAGE_MIME_TYPES:
+            # Falhou no caminho síncrono — enfileira para retry offline (não bloqueia o upload).
+            from core.models import PendingCloudinaryUpload
+            PendingCloudinaryUpload.objects.create(media=media)
 
         results.append(UploadResultItem(
             filename=f.name,
@@ -394,6 +402,9 @@ def upload_edited(
             media_version.cloudinary_url = cloudinary_result["url"]
             media_version.cloudinary_public_id = cloudinary_result["public_id"]
             media_version.save(update_fields=["cloudinary_url", "cloudinary_public_id"])
+        elif f.content_type in IMAGE_MIME_TYPES:
+            from core.models import PendingCloudinaryUpload
+            PendingCloudinaryUpload.objects.create(media_version=media_version)
 
         media.status = "pending_review"
         media.save(update_fields=["status", "last_status_change"])

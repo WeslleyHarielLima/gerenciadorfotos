@@ -13,15 +13,16 @@
 
 ## MUDANÇA 1 — Cloudinary (thumbnails e URLs públicas)
 
-### 🟢 Código (sem bloqueio)
-- [ ] Adicionar **backoff exponencial** em `api/services/cloudinary_service.py`
-      (hoje é `try/except` simples — seguir o padrão de retry do `shared/drive.py`)
-- [ ] Criar modelo **`PendingCloudinaryUpload`** (espelhando `PendingDriveDeletion`)
-      para reenfileirar uploads que falharam, em vez de só logar e seguir
-- [ ] Migration do novo modelo `PendingCloudinaryUpload`
-- [ ] Ao falhar o upload no Cloudinary nos endpoints `upload` e `upload-edited`,
-      registrar pendência na fila em vez de descartar
-- [ ] Criar **script de retry** que processa a fila de pendências
+### 🟢 Código (sem bloqueio) — ✅ FEITO (21/06/2026)
+- [x] **Backoff exponencial** em `cloudinary_service.py` (`_with_backoff`, delays `[1,2,4,8,16]`
+      igual ao `shared/drive.py`) + `upload_with_backoff` usado pelo retry offline
+- [x] Modelo **`PendingCloudinaryUpload`** (FK media/media_version, attempts, status) — migration `0011`
+- [x] Endpoints `upload` e `upload-edited`: ao falhar o Cloudinary (só p/ imagens),
+      **enfileiram** `PendingCloudinaryUpload` em vez de descartar — sem bloquear o upload
+- [x] **Script de retry** `scripts/cloudinary_retry.py`: baixa do Drive → sobe ao Cloudinary
+      com backoff, grava URL na Media/MediaVersion, MAX_ATTEMPTS=5, loga em `ScriptExecutionLog`
+- [x] Admin: `PendingCloudinaryUploadAdmin` com alerta de 3+ tentativas
+- [ ] **Operacional:** agendar `cloudinary_retry` no cron (ex.: a cada 5–10 min)
 
 ### 🔴 Backfill (bloqueado)
 - [ ] Confirmar **credenciais e plano** do Cloudinary (limites de upload/transformação)
@@ -92,7 +93,7 @@ assim que sobe. Nenhuma trava sequencial; sem etapa de "finalizar".
 
 ## ORDEM SUGERIDA
 1. ~~**Upload parcial**~~ ✅ resolvido (concorrente + contador)
-2. **Cloudinary — retry + backoff** (🟢 sem bloqueio, alto valor)
+2. ~~**Cloudinary — retry + backoff**~~ ✅ feito (falta agendar no cron)
 3. **Cloudinary — backfill** (🔴 após credenciais + contagem em prod)
 4. **Verificações em prod** (Mudança 4 + migration da Mudança 2)
 
