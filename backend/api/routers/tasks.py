@@ -493,7 +493,8 @@ def publish_queue(request):
             media_id=media.id,
             original_filename=media.original_filename,
             mime_type=media.mime_type,
-            cloudinary_url=media.cloudinary_url or None,
+            # Mostra a versão editada/aprovada (a que será publicada), não a original.
+            cloudinary_url=version.cloudinary_url or media.cloudinary_url or None,
             proxy_url=f"/api/media/proxy/{version.drive_file_id}",
             event_name=event.name,
             city_name=str(city),
