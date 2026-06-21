@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MediaDetail } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
+import { IC, Ico } from "@/components/icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -15,13 +16,13 @@ const STATUS_LABELS: Record<string, string> = {
   rejected_final: "Rejeitado",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  uploaded: "bg-gray-100 text-gray-700",
-  selected_for_edit: "bg-blue-100 text-blue-700",
-  pending_review: "bg-yellow-100 text-yellow-700",
-  approved: "bg-green-100 text-green-700",
-  published: "bg-emerald-100 text-emerald-700",
-  rejected_final: "bg-red-100 text-red-700",
+const STATUS_BADGE: Record<string, string> = {
+  uploaded: "ds-badge-neutral",
+  selected_for_edit: "ds-badge-info",
+  pending_review: "ds-badge-warning",
+  approved: "ds-badge-success",
+  published: "ds-badge-success",
+  rejected_final: "ds-badge-danger",
 };
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
@@ -29,6 +30,13 @@ const VERSION_STATUS_LABELS: Record<string, string> = {
   edited: "Editada",
   approved: "Aprovada",
   rejected: "Rejeitada",
+};
+
+const VERSION_STATUS_BADGE: Record<string, string> = {
+  approved: "ds-badge-success",
+  rejected: "ds-badge-danger",
+  original: "ds-badge-neutral",
+  edited: "ds-badge-info",
 };
 
 function formatBytes(bytes: number) {
@@ -78,32 +86,42 @@ export default function PhotoDrawer({ mediaId, onClose }: PhotoDrawerProps) {
     <>
       {/* Overlay semitransparente */}
       <div
-        className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        style={{ background: "var(--bg-overlay)" }}
         onClick={onClose}
       />
 
       {/* Painel deslizante */}
       <aside
-        className={`fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed top-0 right-0 h-full w-full max-w-lg z-50 flex flex-col transform transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
+        style={{
+          background: "var(--bg-card)",
+          borderLeft: "1px solid var(--border-default)",
+          boxShadow: "var(--shadow-notif)",
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <span className="text-sm font-semibold text-gray-700 truncate max-w-xs">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}
+        >
+          <span className="ds-text-primary truncate max-w-xs" style={{ fontSize: 14, fontWeight: 600 }}>
             {detail ? detail.original_filename : "Carregando…"}
           </span>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-2xl leading-none ml-4 flex-shrink-0"
+            className="ds-text-muted ds-hover ml-4 flex-shrink-0 flex items-center justify-center rounded"
+            style={{ width: 30, height: 30 }}
             aria-label="Fechar"
           >
-            ×
+            <Ico d={IC.close} size={18} />
           </button>
         </div>
 
         {/* Corpo com scroll */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
-            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+            <div className="ds-text-muted flex items-center justify-center h-48" style={{ fontSize: 13 }}>
               Carregando…
             </div>
           )}
@@ -111,17 +129,21 @@ export default function PhotoDrawer({ mediaId, onClose }: PhotoDrawerProps) {
           {!loading && detail && (
             <>
               {/* Foto */}
-              <div className="bg-gray-50 flex items-center justify-center p-4">
+              <div
+                className="flex items-center justify-center p-4"
+                style={{ background: "var(--bg-card-muted)" }}
+              >
                 {detail.cloudinary_url ? (
                   <img
                     src={detail.cloudinary_url}
                     alt={detail.original_filename}
-                    className="max-h-80 max-w-full object-contain rounded shadow"
+                    className="max-h-80 max-w-full object-contain rounded"
+                    style={{ boxShadow: "var(--shadow-notif)" }}
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
-                    <span className="text-5xl">🖼</span>
-                    <span className="text-xs">Thumbnail não disponível</span>
+                  <div className="ds-text-muted flex flex-col items-center justify-center h-48 gap-2">
+                    <Ico d={IC.image} size={40} />
+                    <span style={{ fontSize: 12 }}>Thumbnail não disponível</span>
                   </div>
                 )}
               </div>
@@ -130,54 +152,52 @@ export default function PhotoDrawer({ mediaId, onClose }: PhotoDrawerProps) {
               <div className="px-5 py-4 space-y-4">
                 {/* Status */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[detail.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  <span className={`ds-badge ${STATUS_BADGE[detail.status] ?? "ds-badge-neutral"}`}>
                     {STATUS_LABELS[detail.status] ?? detail.status}
                   </span>
-                  <span className="text-xs text-gray-400">{detail.mime_type}</span>
-                  <span className="text-xs text-gray-400">{formatBytes(detail.file_size)}</span>
+                  <span className="ds-text-muted" style={{ fontSize: 12 }}>{detail.mime_type}</span>
+                  <span className="ds-text-muted" style={{ fontSize: 12 }}>{formatBytes(detail.file_size)}</span>
                 </div>
 
                 {/* Evento */}
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Evento</p>
-                  <p className="text-sm text-gray-800 font-medium">{detail.event_name}</p>
-                  <p className="text-xs text-gray-500">{detail.city_name}</p>
+                  <p className="ds-eyebrow" style={{ marginBottom: 4 }}>Evento</p>
+                  <p className="ds-text-primary" style={{ fontSize: 14, fontWeight: 600 }}>{detail.event_name}</p>
+                  <p className="ds-text-secondary" style={{ fontSize: 12 }}>{detail.city_name}</p>
                 </div>
 
                 {/* Uploader / Data */}
                 <div className="flex gap-6">
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Enviado por</p>
-                    <p className="text-sm text-gray-800">{detail.uploaded_by}</p>
+                    <p className="ds-eyebrow" style={{ marginBottom: 4 }}>Enviado por</p>
+                    <p className="ds-text-primary" style={{ fontSize: 14 }}>{detail.uploaded_by}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Data de upload</p>
-                    <p className="text-sm text-gray-800">{formatDateTime(detail.created_at)}</p>
+                    <p className="ds-eyebrow" style={{ marginBottom: 4 }}>Data de upload</p>
+                    <p className="ds-text-primary" style={{ fontSize: 14 }}>{formatDateTime(detail.created_at)}</p>
                   </div>
                 </div>
 
                 {/* Histórico de versões */}
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Histórico de versões</p>
+                  <p className="ds-eyebrow" style={{ marginBottom: 8 }}>Histórico de versões</p>
                   <div className="space-y-2">
                     {detail.versions.map((v) => (
-                      <div key={v.version} className="flex items-start gap-3 text-sm">
-                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 text-gray-600 text-xs flex items-center justify-center font-semibold">
+                      <div key={v.version} className="flex items-start gap-3" style={{ fontSize: 14 }}>
+                        <span
+                          className="ds-card-muted ds-text-secondary flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
+                          style={{ fontSize: 12, fontWeight: 600 }}
+                        >
                           v{v.version}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              v.status === "approved" ? "bg-green-100 text-green-700" :
-                              v.status === "rejected" ? "bg-red-100 text-red-700" :
-                              v.status === "original" ? "bg-gray-100 text-gray-600" :
-                              "bg-blue-100 text-blue-700"
-                            }`}>
+                            <span className={`ds-badge ${VERSION_STATUS_BADGE[v.status] ?? "ds-badge-info"}`}>
                               {VERSION_STATUS_LABELS[v.status] ?? v.status}
                             </span>
-                            <span className="text-xs text-gray-400">{formatBytes(v.file_size)}</span>
+                            <span className="ds-text-muted" style={{ fontSize: 12 }}>{formatBytes(v.file_size)}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="ds-text-secondary" style={{ fontSize: 12, marginTop: 2 }}>
                             {v.edited_by ? `por ${v.edited_by} · ` : ""}{formatDateTime(v.edited_at)}
                           </p>
                         </div>

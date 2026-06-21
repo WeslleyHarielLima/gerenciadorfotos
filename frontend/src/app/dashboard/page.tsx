@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
+import { IC, Ico } from "@/components/icons";
 import type { ActiveTask, City } from "@/lib/types";
 
 const ROLE_SEGMENT: Record<string, string> = {
@@ -18,6 +19,14 @@ const ROLE_LABELS: Record<string, string> = {
   editor: "Editar",
   curator: "Revisar",
   publisher: "Publicar",
+  uploader: "Enviar",
+};
+
+const ROLE_BADGE: Record<string, string> = {
+  editor: "ds-badge-accent",
+  curator: "ds-badge-warning",
+  publisher: "ds-badge-success",
+  uploader: "ds-badge-info",
 };
 
 function activeTaskLink(task: ActiveTask): string {
@@ -32,7 +41,6 @@ export default function CitiesPage() {
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
     const { user } = loadAuth();
@@ -40,17 +48,13 @@ export default function CitiesPage() {
       router.replace("/");
       return;
     }
-    setUserRole(user.role);
 
     if (user.role === "admin") {
       router.replace("/dashboard/admin");
       return;
     }
 
-    Promise.all([
-      ApiClient.getCities(),
-      ApiClient.getActiveTasks(),
-    ])
+    Promise.all([ApiClient.getCities(), ApiClient.getActiveTasks()])
       .then(([c, t]) => {
         setCities(c);
         setActiveTasks(t);
@@ -60,43 +64,41 @@ export default function CitiesPage() {
   }, [router]);
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10">
+    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Em andamento */}
-      <section className="mb-10">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          Em andamento
-        </h3>
-        {loading && <p className="text-sm text-gray-400">Carregando...</p>}
+      <section style={{ marginBottom: 36 }}>
+        <h3 className="ds-eyebrow" style={{ marginBottom: 12 }}>Em andamento</h3>
+
+        {loading && <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>}
         {!loading && activeTasks.length === 0 && (
-          <p className="text-sm text-gray-400">Nenhuma tarefa em andamento.</p>
+          <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma tarefa em andamento.</p>
         )}
+
         {!loading && activeTasks.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {activeTasks.map((task) => (
               <Link
                 key={task.task_id}
                 href={activeTaskLink(task)}
-                className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100 transition-colors"
+                className="ds-card ds-row-hover"
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", textDecoration: "none" }}
               >
-                {/* Thumbnail */}
                 {task.cloudinary_url ? (
                   <img
                     src={task.cloudinary_url}
                     alt={task.filename}
-                    className="w-10 h-10 rounded object-cover flex-shrink-0 bg-gray-100"
+                    style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "var(--bg-card-muted)" }}
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-300 text-base">
-                    🖼
+                  <div style={{ width: 40, height: 40, borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--brand-secondary) 12%, transparent)", color: "var(--brand-secondary)" }}>
+                    <Ico d={IC.image} size={18} />
                   </div>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{task.filename}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {task.event_name} · {task.city_name}
-                  </p>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p className="ds-text-primary" style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.filename}</p>
+                  <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 2 }}>{task.event_name} · {task.city_name}</p>
                 </div>
-                <span className="ml-2 shrink-0 text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
+                <span className={`ds-badge ${ROLE_BADGE[task.role_type] ?? "ds-badge-neutral"}`}>
                   {ROLE_LABELS[task.role_type] ?? task.role_type}
                 </span>
               </Link>
@@ -107,36 +109,38 @@ export default function CitiesPage() {
 
       {/* Cidades */}
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
-          Cidades com trabalho
-        </h3>
+        <h3 className="ds-eyebrow" style={{ marginBottom: 14 }}>Cidades com trabalho</h3>
 
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>
-        )}
+        {error && <p className="ds-alert ds-alert-danger" style={{ marginBottom: 12 }}>{error}</p>}
 
         {!loading && !error && cities.length === 0 && (
-          <p className="text-sm text-gray-400">Nenhuma cidade com eventos ativos no momento.</p>
+          <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma cidade com eventos ativos no momento.</p>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {cities.map((city) => (
             <Link
               key={city.id}
               href={`/dashboard/${city.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-blue-300 transition-all"
+              className="ds-card ds-hover"
+              style={{ padding: 18, textDecoration: "none", display: "block" }}
             >
-              <p className="font-semibold text-gray-900">{city.name}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{city.state}</p>
-              <p className="text-xs text-blue-600 mt-3 font-medium">
-                {city.active_event_count}{" "}
-                evento{city.active_event_count !== 1 ? "s" : ""} ativo
-                {city.active_event_count !== 1 ? "s" : ""}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--brand-primary) 12%, transparent)", color: "var(--brand-primary)" }}>
+                  <Ico d={IC.city} size={18} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p className="ds-text-primary" style={{ fontSize: 14, fontWeight: 700 }}>{city.name}</p>
+                  <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 1 }}>{city.state}</p>
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--brand-secondary)", marginTop: 14, fontWeight: 600 }}>
+                {city.active_event_count} evento{city.active_event_count !== 1 ? "s" : ""} ativo{city.active_event_count !== 1 ? "s" : ""}
               </p>
             </Link>
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

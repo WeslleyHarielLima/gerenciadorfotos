@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
+import { IC, Ico } from "@/components/icons";
 import { Event, EventUploadStats, UploadResultItem } from "@/lib/types";
 
 interface FileItem {
@@ -135,33 +136,31 @@ export default function UploaderPage() {
   const errorCount = files.filter((f) => f.status === "error").length;
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10">
-      <nav className="text-sm text-gray-500 mb-6 flex items-center gap-2 flex-wrap">
-        <Link href="/dashboard" className="hover:text-blue-600 transition-colors">Início</Link>
-        <span className="text-gray-300">›</span>
-        <Link href={`/dashboard/${cityId}`} className="hover:text-blue-600 transition-colors">
-          {event?.city_name ?? "Cidade"}
-        </Link>
-        <span className="text-gray-300">›</span>
-        <span className="text-gray-800 font-medium">{event?.name ?? "Evento"}</span>
+    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
+        <Link href="/dashboard">Início</Link>
+        <span className="sep">›</span>
+        <Link href={`/dashboard/${cityId}`}>{event?.city_name ?? "Cidade"}</Link>
+        <span className="sep">›</span>
+        <span className="current">{event?.name ?? "Evento"}</span>
       </nav>
 
-      <h2 className="text-xl font-semibold text-gray-800 mb-1">Enviar fotos/vídeos</h2>
+      <h2 className="ds-title" style={{ marginBottom: 6 }}>Enviar fotos/vídeos</h2>
       {event && (
-        <p className="text-sm text-gray-500 mb-2">{event.name}</p>
+        <p className="ds-text-muted" style={{ fontSize: 13, marginBottom: 12 }}>{event.name}</p>
       )}
       {stats && (
-        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm px-3 py-1.5 rounded-lg mb-6">
-          <span className="font-semibold">{stats.total}</span>
+        <div className="ds-badge ds-badge-info" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 24 }}>
+          <span style={{ fontWeight: 700 }}>{stats.total}</span>
           foto{stats.total !== 1 ? "s" : ""} já enviada{stats.total !== 1 ? "s" : ""} neste evento
           {stats.in_pool > 0 && (
-            <span className="text-blue-500">· {stats.in_pool} aguardando edição</span>
+            <span className="ds-text-muted">· {stats.in_pool} aguardando edição</span>
           )}
         </div>
       )}
 
       {loadError && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
+        <div className="ds-alert ds-alert-danger" style={{ marginBottom: 24 }}>
           {loadError}
         </div>
       )}
@@ -174,17 +173,19 @@ export default function UploaderPage() {
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
             onClick={() => inputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors mb-6
-              ${dragOver
-                ? "border-blue-400 bg-blue-50"
-                : "border-gray-300 bg-gray-50 hover:border-blue-300 hover:bg-gray-100"
-              }`}
+            className="rounded-xl p-12 text-center cursor-pointer mb-6"
+            style={{
+              border: `2px dashed ${dragOver ? "var(--brand-primary)" : "var(--border-default)"}`,
+              background: dragOver ? "var(--bg-card-emphasis)" : "var(--bg-card-muted)",
+              transition: "var(--tr)",
+            }}
           >
-            <p className="text-gray-500 text-sm">
+            <Ico d={IC.upload} size={28} />
+            <p className="ds-text-secondary" style={{ fontSize: 13, marginTop: 8 }}>
               Arraste fotos ou vídeos aqui, ou{" "}
-              <span className="text-blue-600 font-medium">clique para selecionar</span>
+              <span className="ds-link" style={{ fontWeight: 600 }}>clique para selecionar</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 4 }}>
               JPEG · PNG · WEBP · HEIC · MP4 · MOV · AVI · MKV
             </p>
             <input
@@ -201,7 +202,7 @@ export default function UploaderPage() {
           {files.length > 0 && (
             <>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm text-gray-600">
+                <p className="ds-text-secondary" style={{ fontSize: 13 }}>
                   {files.length} arquivo{files.length !== 1 ? "s" : ""}
                   {doneCount > 0 && ` · ${doneCount} enviado${doneCount !== 1 ? "s" : ""}`}
                   {errorCount > 0 && ` · ${errorCount} com erro`}
@@ -209,13 +210,14 @@ export default function UploaderPage() {
                 {pendingCount > 0 && !uploading && (
                   <button
                     onClick={handleUpload}
-                    className="bg-blue-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="ds-btn ds-btn-primary"
+                    style={{ padding: "9px 18px", fontSize: 13 }}
                   >
                     Enviar {pendingCount} arquivo{pendingCount !== 1 ? "s" : ""}
                   </button>
                 )}
                 {uploading && (
-                  <span className="text-sm text-blue-600">
+                  <span className="ds-text-secondary" style={{ fontSize: 13 }}>
                     Enviando… {progress.done}/{progress.total}
                   </span>
                 )}
@@ -223,10 +225,10 @@ export default function UploaderPage() {
 
               {/* Barra de progresso */}
               {uploading && (
-                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-4">
+                <div className="w-full rounded-full h-1.5 mb-4" style={{ background: "var(--bg-card-emphasis)" }}>
                   <div
-                    className="bg-blue-500 h-1.5 rounded-full transition-all"
-                    style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+                    className="h-1.5 rounded-full transition-all"
+                    style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`, background: "var(--brand-primary)" }}
                   />
                 </div>
               )}
@@ -235,10 +237,11 @@ export default function UploaderPage() {
                 {files.map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3"
+                    className="ds-card flex items-center gap-3"
+                    style={{ padding: "12px 16px" }}
                   >
                     {/* Miniatura */}
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "var(--bg-card-emphasis)" }}>
                       {item.preview ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={item.preview} alt="" className="w-full h-full object-cover" />
@@ -249,12 +252,12 @@ export default function UploaderPage() {
 
                     {/* Nome e tamanho */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{item.file.name}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="ds-text-primary truncate" style={{ fontSize: 13, fontWeight: 600 }}>{item.file.name}</p>
+                      <p className="ds-text-muted" style={{ fontSize: 12 }}>
                         {(item.file.size / 1024 / 1024).toFixed(1)} MB
                       </p>
                       {item.status === "error" && item.result?.error && (
-                        <p className="text-xs text-red-600 mt-0.5">{item.result.error}</p>
+                        <p style={{ fontSize: 12, marginTop: 2, color: "var(--state-danger)" }}>{item.result.error}</p>
                       )}
                     </div>
 
@@ -263,20 +266,21 @@ export default function UploaderPage() {
                       {item.status === "pending" && (
                         <button
                           onClick={() => removeFile(idx)}
-                          className="text-gray-400 hover:text-red-500 text-xs transition-colors"
+                          className="ds-text-muted"
+                          style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", transition: "var(--tr)" }}
                           disabled={uploading}
                         >
                           Remover
                         </button>
                       )}
                       {item.status === "uploading" && (
-                        <span className="text-xs text-blue-500">Enviando…</span>
+                        <span className="ds-text-secondary" style={{ fontSize: 12 }}>Enviando…</span>
                       )}
                       {item.status === "done" && (
-                        <span className="text-xs text-green-600 font-medium">Enviado</span>
+                        <span className="ds-badge ds-badge-success">Enviado</span>
                       )}
                       {item.status === "error" && (
-                        <span className="text-xs text-red-600 font-medium">Erro</span>
+                        <span className="ds-badge ds-badge-danger">Erro</span>
                       )}
                     </div>
                   </div>
@@ -286,6 +290,6 @@ export default function UploaderPage() {
           )}
         </>
       )}
-    </main>
+    </div>
   );
 }

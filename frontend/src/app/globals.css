@@ -2,26 +2,379 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ══════════════════════════════════════════════════════════
+   DESIGN SYSTEM — WIVESLANDO NEIVA 2026
+   Tokens disponíveis via CSS custom properties em todo o app.
+   Uso: var(--nome-do-token)
+══════════════════════════════════════════════════════════ */
+
+/* ── TEMA ESCURO (padrão) ─────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-app:            #08111f;
+  --bg-sidebar:        #0b1627;
+  --bg-topbar:         rgba(8, 17, 31, 0.90);
+  --bg-canvas:         #101a2d;
+  --bg-card:           #142137;
+  --bg-card-muted:     #0f1a2c;
+  --bg-card-emphasis:  #1a2942;
+  --bg-overlay:        rgba(3, 8, 18, 0.62);
+
+  /* Texto */
+  --text-primary:   #f4f7fb;
+  --text-secondary: #cad4e3;
+  --text-muted:     #8da0bb;
+  --text-on-brand:  #08111f;
+
+  /* Bordas */
+  --border-default: rgba(202, 212, 227, 0.13);
+  --border-strong:  rgba(202, 212, 227, 0.22);
+  --border-subtle:  rgba(202, 212, 227, 0.07);
+
+  /* Marca */
+  --brand-primary:        #f2c230;
+  --brand-primary-strong: #d7a300;
+  --brand-secondary:      #2f74ff;
+  --brand-banner-overlay: linear-gradient(100deg, rgba(8,17,31,0.82) 0%, rgba(8,17,31,0.35) 60%, rgba(8,17,31,0.10) 100%);
+
+  /* Estados */
+  --state-success: #1fbf75;
+  --state-warning: #f39b22;
+  --state-danger:  #e85d5d;
+  --state-info:    #56a6ff;
+
+  /* Gráficos */
+  --chart-1:            #f2c230;
+  --chart-2:            #2f74ff;
+  --chart-3:            #35c0a1;
+  --chart-4:            #f39b22;
+  --chart-5:            #b58cff;
+  --chart-grid:         rgba(202, 212, 227, 0.07);
+  --chart-axis:         rgba(202, 212, 227, 0.35);
+  --chart-tooltip-bg:   #0b1627;
+  --chart-tooltip-text: #f4f7fb;
+
+  /* Inputs */
+  --input-bg:           rgba(255, 255, 255, 0.05);
+  --input-border:       rgba(202, 212, 227, 0.16);
+  --input-border-focus: #2f74ff;
+
+  /* Sidebar */
+  --sidebar-active-bg:   rgba(242, 194, 48, 0.11);
+  --sidebar-active-text: #f2c230;
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.04);
+
+  /* Login (overlays de página inteira) */
+  --overlay-left:   linear-gradient(to right, rgba(5,12,24,0.95) 0%, rgba(5,12,24,0.75) 35%, rgba(5,12,24,0.10) 65%, rgba(5,12,24,0.02) 100%);
+  --overlay-bottom: linear-gradient(to bottom, rgba(5,12,24,0) 30%, rgba(5,12,24,0.96) 100%);
+
+  /* Misc */
+  --scrollbar-thumb:    rgba(202, 212, 227, 0.12);
+  --shadow-card:        0 1px 3px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.22);
+  --shadow-notif:       0 8px 40px rgba(0,0,0,0.55);
+  --shadow-emphasis:    0 0 0 1px var(--brand-primary), 0 4px 24px rgba(242,194,48,0.14);
+
+  /* Configuração */
+  --radius:       12px;
+  --topbar-blur:  blur(12px);
+  --tr:           200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── TEMA CLARO ───────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-app:            #eef3f9;
+  --bg-sidebar:        #dde7f3;
+  --bg-topbar:         rgba(255, 255, 255, 0.92);
+  --bg-canvas:         #f6f9fd;
+  --bg-card:           #ffffff;
+  --bg-card-muted:     #edf3fa;
+  --bg-card-emphasis:  #e4edf8;
+  --bg-overlay:        rgba(230, 238, 247, 0.72);
+
+  --text-primary:   #172235;
+  --text-secondary: #42536b;
+  --text-muted:     #6d7e96;
+  --text-on-brand:  #172235;
+
+  --border-default: rgba(23, 34, 53, 0.10);
+  --border-strong:  rgba(23, 34, 53, 0.18);
+  --border-subtle:  rgba(23, 34, 53, 0.06);
+
+  --brand-primary:        #b88800;
+  --brand-primary-strong: #8f6900;
+  --brand-secondary:      #1f62ea;
+  --brand-banner-overlay: linear-gradient(100deg, rgba(23,34,53,0.80) 0%, rgba(23,34,53,0.30) 60%, rgba(23,34,53,0.05) 100%);
+
+  --state-success: #148b58;
+  --state-warning: #c87a12;
+  --state-danger:  #c54444;
+  --state-info:    #1f62ea;
+
+  --chart-1:            #b88800;
+  --chart-2:            #1f62ea;
+  --chart-3:            #169e86;
+  --chart-4:            #c87a12;
+  --chart-5:            #8b67d6;
+  --chart-grid:         rgba(23, 34, 53, 0.08);
+  --chart-axis:         rgba(23, 34, 53, 0.35);
+  --chart-tooltip-bg:   #172235;
+  --chart-tooltip-text: #ffffff;
+
+  --input-bg:           rgba(23, 34, 53, 0.04);
+  --input-border:       rgba(23, 34, 53, 0.14);
+  --input-border-focus: #1f62ea;
+
+  --sidebar-active-bg:   rgba(184, 136, 0, 0.12);
+  --sidebar-active-text: #8f6900;
+  --sidebar-hover-bg:    rgba(23, 34, 53, 0.05);
+
+  --overlay-left:   linear-gradient(to right, rgba(238,243,249,0.97) 0%, rgba(238,243,249,0.80) 35%, rgba(238,243,249,0.20) 65%, rgba(238,243,249,0) 100%);
+  --overlay-bottom: linear-gradient(to bottom, rgba(238,243,249,0) 30%, rgba(238,243,249,0.97) 100%);
+
+  --scrollbar-thumb:  rgba(23, 34, 53, 0.12);
+  --shadow-card:      0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-notif:     0 8px 40px rgba(0,0,0,0.18);
+  --shadow-emphasis:  0 0 0 1px var(--brand-primary), 0 4px 24px rgba(184,136,0,0.14);
+}
+
+/* ── BASE ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 100px;
+}
+
+/* ── ANIMAÇÕES GLOBAIS ────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── HELPERS — LOGIN ──────────────────────────────────── */
+.ds-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 9px;
+  height: 44px;
+  transition: border-color var(--tr), box-shadow var(--tr);
+}
+.ds-input-wrap:focus-within {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px rgba(47, 116, 255, 0.14);
+}
+.ds-input-wrap.ds-error {
+  border-color: var(--state-danger);
+}
+.ds-input-wrap.ds-error:focus-within {
+  border-color: var(--state-danger);
+  box-shadow: 0 0 0 3px rgba(232, 93, 93, 0.14);
+}
+
+.ds-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DS — UTILITÁRIOS REUTILIZÁVEIS (linguagem visual "Visão geral")
+   Use estas classes em todo o app em vez de cores cruas do Tailwind.
+══════════════════════════════════════════════════════════ */
+
+/* ── Superfícies ──────────────────────────────────────── */
+.ds-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.ds-card-muted {
+  background: var(--bg-card-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+.ds-card-emphasis {
+  background: var(--bg-card-emphasis);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.ds-hover {
+  transition: transform var(--tr), box-shadow var(--tr), border-color var(--tr);
+}
+.ds-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+  border-color: var(--border-strong);
+}
+.ds-row-hover {
+  transition: background var(--tr), border-color var(--tr);
+}
+.ds-row-hover:hover {
+  background: var(--bg-card-muted);
+}
+
+/* ── Tipografia ───────────────────────────────────────── */
+.ds-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ds-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.ds-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ds-text-primary   { color: var(--text-primary); }
+.ds-text-secondary { color: var(--text-secondary); }
+.ds-text-muted     { color: var(--text-muted); }
+
+/* ── Badges / pílulas de status ───────────────────────── */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.ds-badge-success { background: color-mix(in srgb, var(--state-success) 13%, transparent); color: var(--state-success); border: 1px solid color-mix(in srgb, var(--state-success) 24%, transparent); }
+.ds-badge-warning { background: color-mix(in srgb, var(--state-warning) 13%, transparent); color: var(--state-warning); border: 1px solid color-mix(in srgb, var(--state-warning) 24%, transparent); }
+.ds-badge-danger  { background: color-mix(in srgb, var(--state-danger) 13%, transparent);  color: var(--state-danger);  border: 1px solid color-mix(in srgb, var(--state-danger) 24%, transparent); }
+.ds-badge-info    { background: color-mix(in srgb, var(--state-info) 13%, transparent);    color: var(--state-info);    border: 1px solid color-mix(in srgb, var(--state-info) 24%, transparent); }
+.ds-badge-brand   { background: color-mix(in srgb, var(--brand-primary) 13%, transparent); color: var(--brand-primary); border: 1px solid color-mix(in srgb, var(--brand-primary) 25%, transparent); }
+.ds-badge-accent  { background: color-mix(in srgb, var(--chart-5) 14%, transparent);       color: var(--chart-5);       border: 1px solid color-mix(in srgb, var(--chart-5) 26%, transparent); }
+.ds-badge-neutral { background: var(--bg-card-muted); color: var(--text-muted); border: 1px solid var(--border-default); }
+
+/* ── Botões ───────────────────────────────────────────── */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-family: inherit;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background var(--tr), border-color var(--tr), color var(--tr), opacity var(--tr);
+  border: 1px solid transparent;
+}
+.ds-btn:disabled { opacity: 0.55; cursor: default; }
+.ds-btn-primary {
+  background: var(--brand-secondary);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(47, 116, 255, 0.30);
+}
+.ds-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.ds-btn-brand {
+  background: var(--brand-primary);
+  color: var(--text-on-brand);
+}
+.ds-btn-brand:hover:not(:disabled) { filter: brightness(1.06); }
+.ds-btn-ghost {
+  background: transparent;
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+.ds-btn-ghost:hover:not(:disabled) { background: var(--sidebar-hover-bg); color: var(--text-primary); }
+.ds-btn-danger {
+  background: color-mix(in srgb, var(--state-danger) 14%, transparent);
+  color: var(--state-danger);
+  border-color: color-mix(in srgb, var(--state-danger) 26%, transparent);
+}
+.ds-btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--state-danger) 22%, transparent); }
+
+/* ── Links ────────────────────────────────────────────── */
+.ds-link {
+  color: var(--brand-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--tr);
+}
+.ds-link:hover { color: var(--brand-primary); }
+
+/* ── Inputs / selects ─────────────────────────────────── */
+.ds-select,
+.ds-text-input {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--tr), box-shadow var(--tr);
+}
+.ds-select:focus,
+.ds-text-input:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px rgba(47, 116, 255, 0.14);
+}
+.ds-select option { background: var(--bg-sidebar); color: var(--text-primary); }
+
+/* ── Breadcrumb ───────────────────────────────────────── */
+.ds-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.ds-breadcrumb a { color: var(--text-muted); text-decoration: none; transition: color var(--tr); }
+.ds-breadcrumb a:hover { color: var(--text-primary); }
+.ds-breadcrumb .sep { color: var(--border-strong); }
+.ds-breadcrumb .current { color: var(--text-secondary); font-weight: 600; }
+
+/* ── Alertas ──────────────────────────────────────────── */
+.ds-alert {
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+.ds-alert-danger  { background: color-mix(in srgb, var(--state-danger) 10%, transparent);  color: var(--state-danger);  border-color: color-mix(in srgb, var(--state-danger) 22%, transparent); }
+.ds-alert-warning { background: color-mix(in srgb, var(--state-warning) 10%, transparent); color: var(--state-warning); border-color: color-mix(in srgb, var(--state-warning) 22%, transparent); }
+.ds-alert-success { background: color-mix(in srgb, var(--state-success) 10%, transparent); color: var(--state-success); border-color: color-mix(in srgb, var(--state-success) 22%, transparent); }
+.ds-alert-info    { background: color-mix(in srgb, var(--state-info) 10%, transparent);    color: var(--state-info);    border-color: color-mix(in srgb, var(--state-info) 22%, transparent); }
+
+/* ── Avatar de marca ──────────────────────────────────── */
+.ds-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: var(--text-on-brand);
+  font-weight: 700;
 }

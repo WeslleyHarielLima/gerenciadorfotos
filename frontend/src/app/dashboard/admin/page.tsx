@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
+import { IC, Ico } from "@/components/icons";
 import type { AdminOverview, BottlenecksResponse, City } from "@/lib/types";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -15,13 +16,13 @@ const PHASE_LABELS: Record<string, string> = {
   rejected_final: "Rejeitado",
 };
 
-const PHASE_COLORS: Record<string, string> = {
-  uploaded: "bg-gray-100 text-gray-700",
-  selected_for_edit: "bg-blue-100 text-blue-700",
-  pending_review: "bg-yellow-100 text-yellow-700",
-  approved: "bg-green-100 text-green-700",
-  published: "bg-emerald-100 text-emerald-700",
-  rejected_final: "bg-red-100 text-red-700",
+const PHASE_BADGE: Record<string, string> = {
+  uploaded: "ds-badge-neutral",
+  selected_for_edit: "ds-badge-info",
+  pending_review: "ds-badge-warning",
+  approved: "ds-badge-success",
+  published: "ds-badge-success",
+  rejected_final: "ds-badge-danger",
 };
 
 const SCRIPT_NAMES: Record<string, string> = {
@@ -65,10 +66,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      ApiClient.getAdminOverview(cityFilter),
-      ApiClient.getBottlenecks(cityFilter),
-    ])
+    Promise.all([ApiClient.getAdminOverview(cityFilter), ApiClient.getBottlenecks(cityFilter)])
       .then(([ov, bn]) => {
         setOverview(ov);
         setBottlenecks(bn);
@@ -79,85 +77,65 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        <p className="text-sm text-gray-400">Carregando...</p>
-      </main>
+      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+        <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>
-      </main>
+      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+        <p className="ds-alert ds-alert-danger">{error}</p>
+      </div>
     );
   }
 
   const hasBottlenecks = (bottlenecks?.bottlenecks.length ?? 0) > 0;
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px", display: "flex", flexDirection: "column", gap: 36 }}>
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Painel Admin</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <h2 className="ds-title">Painel Admin</h2>
         <select
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="ds-select"
           value={cityFilter ?? ""}
           onChange={(e) => setCityFilter(e.target.value ? Number(e.target.value) : undefined)}
         >
           <option value="">Todas as cidades</option>
           {cities.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}/{c.state}
-            </option>
+            <option key={c.id} value={c.id}>{c.name}/{c.state}</option>
           ))}
         </select>
       </div>
 
       {/* Saúde dos scripts */}
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          Saúde dos Scripts
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <h3 className="ds-eyebrow" style={{ marginBottom: 12 }}>Saúde dos Scripts</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
           {overview &&
             Object.entries(overview.script_health).map(([key, health]) => (
               <div
                 key={key}
-                className={`rounded-xl border p-4 ${
-                  health.is_healthy
-                    ? "border-green-200 bg-green-50"
-                    : "border-red-200 bg-red-50"
-                }`}
+                className="ds-card"
+                style={{ padding: 16, borderColor: health.is_healthy ? "color-mix(in srgb, var(--state-success) 28%, transparent)" : "color-mix(in srgb, var(--state-danger) 28%, transparent)" }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-800">
-                    {SCRIPT_NAMES[key] ?? key}
-                  </span>
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      health.is_healthy
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span className="ds-text-primary" style={{ fontSize: 13, fontWeight: 600 }}>{SCRIPT_NAMES[key] ?? key}</span>
+                  <span className={`ds-badge ${health.is_healthy ? "ds-badge-success" : "ds-badge-danger"}`}>
                     {health.is_healthy ? "OK" : health.last_status ?? "sem execução"}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">
-                  Última execução: {formatDate(health.last_run)}
-                </p>
+                <p className="ds-text-muted" style={{ fontSize: 12 }}>Última execução: {formatDate(health.last_run)}</p>
               </div>
             ))}
         </div>
         {overview && overview.pending_validation_count > 0 && (
-          <p className="mt-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-            ⚠ {overview.pending_validation_count} evento(s) aguardando validação de localização.{" "}
-            <a
-              href="/admin/core/event/?status__exact=pending_validation"
-              target="_blank"
-              className="underline font-medium"
-            >
+          <p className="ds-alert ds-alert-warning" style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <Ico d={IC.alert} size={15} />
+            {overview.pending_validation_count} evento(s) aguardando validação de localização.{" "}
+            <a href="/admin/core/event/?status__exact=pending_validation" target="_blank" style={{ textDecoration: "underline", fontWeight: 600, color: "inherit" }}>
               Ver no admin
             </a>
           </p>
@@ -167,31 +145,25 @@ export default function AdminDashboard() {
       {/* Gargalos */}
       {hasBottlenecks && (
         <section>
-          <h3 className="text-xs font-semibold text-red-500 uppercase tracking-widest mb-3">
-            ⚠ Gargalos detectados
+          <h3 className="ds-eyebrow" style={{ marginBottom: 12, color: "var(--state-danger)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Ico d={IC.alert} size={13} /> Gargalos detectados</span>
           </h3>
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {bottlenecks!.bottlenecks.map((b, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+                className="ds-card"
+                style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "12px 16px", borderColor: "color-mix(in srgb, var(--state-danger) 26%, transparent)" }}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{b.filename}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {b.event_name} · {b.city_name}
-                    {b.assigned_to && ` · ${b.assigned_to}`}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="ds-text-primary" style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.filename}</p>
+                  <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+                    {b.event_name} · {b.city_name}{b.assigned_to && ` · ${b.assigned_to}`}
                   </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      PHASE_COLORS[b.phase] ?? "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {PHASE_LABELS[b.phase] ?? b.phase}
-                  </span>
-                  <p className="text-xs text-red-600 mt-1 font-semibold">
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <span className={`ds-badge ${PHASE_BADGE[b.phase] ?? "ds-badge-neutral"}`}>{PHASE_LABELS[b.phase] ?? b.phase}</span>
+                  <p style={{ fontSize: 12, marginTop: 6, fontWeight: 600, color: "var(--state-danger)" }}>
                     {formatHours(b.hours_stuck)} parado (limite: {formatHours(b.threshold_hours)})
                   </p>
                 </div>
@@ -203,13 +175,11 @@ export default function AdminDashboard() {
 
       {/* Visão geral de eventos */}
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          Eventos ativos
-        </h3>
+        <h3 className="ds-eyebrow" style={{ marginBottom: 12 }}>Eventos ativos</h3>
         {overview && overview.events.length === 0 && (
-          <p className="text-sm text-gray-400">Nenhum evento ativo.</p>
+          <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhum evento ativo.</p>
         )}
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {overview &&
             overview.events.map((event) => {
               const { counts } = event;
@@ -221,38 +191,22 @@ export default function AdminDashboard() {
                 counts.published +
                 counts.rejected_final;
               return (
-                <div
-                  key={event.id}
-                  className="bg-white rounded-xl border border-gray-200 px-5 py-4"
-                >
-                  <div className="flex items-center justify-between mb-3">
+                <div key={event.id} className="ds-card" style={{ padding: "16px 18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
                     <div>
-                      <p className="font-semibold text-gray-900">{event.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {event.city_name}
-                        {event.event_date && ` · ${event.event_date}`}
+                      <p className="ds-text-primary" style={{ fontSize: 14, fontWeight: 700 }}>{event.name}</p>
+                      <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 1 }}>
+                        {event.city_name}{event.event_date && ` · ${event.event_date}`}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">{total} arquivo(s)</span>
+                    <span className="ds-text-muted" style={{ fontSize: 12, flexShrink: 0 }}>{total} arquivo(s)</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        "uploaded",
-                        "selected_for_edit",
-                        "pending_review",
-                        "approved",
-                        "published",
-                        "rejected_final",
-                      ] as const
-                    ).map((phase) => {
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {(["uploaded", "selected_for_edit", "pending_review", "approved", "published", "rejected_final"] as const).map((phase) => {
                       const count = counts[phase];
                       if (count === 0) return null;
                       return (
-                        <span
-                          key={phase}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-full ${PHASE_COLORS[phase]}`}
-                        >
+                        <span key={phase} className={`ds-badge ${PHASE_BADGE[phase]}`}>
                           {PHASE_LABELS[phase]}: {count}
                         </span>
                       );
@@ -263,6 +217,6 @@ export default function AdminDashboard() {
             })}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

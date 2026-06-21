@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiClient } from "@/lib/api";
 import { ReviewItem, VersionHistoryItem } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
+import { IC, Ico } from "@/components/icons";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -45,50 +46,62 @@ function MediaViewer({ proxyUrl, alt }: { proxyUrl: string; alt: string }) {
 
   if (error)
     return (
-      <div className="flex items-center justify-center h-48 bg-gray-100 rounded-lg text-sm text-gray-400">
+      <div
+        className="flex items-center justify-center h-48 rounded-lg ds-text-muted"
+        style={{ fontSize: 13, background: "var(--bg-card-muted)", border: "1px solid var(--border-subtle)" }}
+      >
         Não foi possível carregar a imagem.
       </div>
     );
   if (!src)
     return (
-      <div className="flex items-center justify-center h-48 bg-gray-100 rounded-lg text-sm text-gray-400 animate-pulse">
+      <div
+        className="flex items-center justify-center h-48 rounded-lg ds-text-muted animate-pulse"
+        style={{ fontSize: 13, background: "var(--bg-card-muted)", border: "1px solid var(--border-subtle)" }}
+      >
         Carregando...
       </div>
     );
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className="w-full rounded-lg object-contain max-h-80 bg-gray-50" />
+    <img
+      src={src}
+      alt={alt}
+      className="w-full rounded-lg object-contain max-h-80"
+      style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }}
+    />
   );
 }
 
 function VersionHistory({ history }: { history: VersionHistoryItem[] }) {
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4">
-      <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-        Histórico de versões
-      </h5>
+    <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+      <h5 className="ds-eyebrow mb-2">Histórico de versões</h5>
       <div className="space-y-1.5">
         {history.map((v) => (
-          <div key={v.version} className="flex items-center gap-3 text-xs text-gray-600">
-            <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">
+          <div key={v.version} className="flex items-center gap-3 ds-text-secondary" style={{ fontSize: 12 }}>
+            <span
+              className="px-2 py-0.5 rounded font-mono ds-text-secondary"
+              style={{ background: "var(--bg-card-muted)" }}
+            >
               v{v.version}
             </span>
             <span
-              className={`px-2 py-0.5 rounded font-medium ${
+              className={`ds-badge ${
                 v.status === "approved"
-                  ? "bg-green-100 text-green-700"
+                  ? "ds-badge-success"
                   : v.status === "rejected"
-                  ? "bg-red-100 text-red-600"
+                  ? "ds-badge-danger"
                   : v.status === "edited"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-gray-100 text-gray-500"
+                  ? "ds-badge-warning"
+                  : "ds-badge-neutral"
               }`}
             >
               {v.status}
             </span>
             <span>{v.edited_by ?? "uploader"}</span>
-            <span className="text-gray-400">{formatDate(v.edited_at)}</span>
-            <span className="text-gray-400">{formatSize(v.file_size)}</span>
+            <span className="ds-text-muted">{formatDate(v.edited_at)}</span>
+            <span className="ds-text-muted">{formatSize(v.file_size)}</span>
           </div>
         ))}
       </div>
@@ -178,48 +191,47 @@ export default function CuratorKanbanPage() {
   };
 
   const decisionColor: Record<ModalMode, string> = {
-    approve: "bg-green-600 hover:bg-green-700",
-    "reject-return": "bg-yellow-500 hover:bg-yellow-600",
-    "reject-final": "bg-red-600 hover:bg-red-700",
+    approve: "ds-btn-brand",
+    "reject-return": "ds-btn-primary",
+    "reject-final": "ds-btn-danger",
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-8">
+    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500 mb-6 flex items-center gap-2">
-        <Link href="/dashboard" className="hover:text-blue-600">Início</Link>
-        <span className="text-gray-300">›</span>
-        <Link href={`/dashboard/${cityId}`} className="hover:text-blue-600">Cidade</Link>
-        <span className="text-gray-300">›</span>
-        <span className="text-gray-800 font-medium">Revisão do Curador</span>
+      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
+        <Link href="/dashboard">Início</Link>
+        <span className="sep">›</span>
+        <Link href={`/dashboard/${cityId}`}>Cidade</Link>
+        <span className="sep">›</span>
+        <span className="current">Revisão do Curador</span>
       </nav>
 
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">
+      <div className="flex items-center justify-between" style={{ marginBottom: 22 }}>
+        <h2 className="ds-title" style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
           Aguardando revisão
           {items.length > 0 && (
-            <span className="ml-2 text-sm font-normal bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-              {items.length}
-            </span>
+            <span className="ds-badge ds-badge-warning">{items.length}</span>
           )}
-        </h1>
+        </h2>
         <button
           onClick={loadQueue}
-          className="text-sm text-blue-600 hover:underline"
+          className="ds-btn ds-btn-ghost"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px" }}
         >
-          Atualizar
+          <Ico d={IC.review} size={14} /> Atualizar
         </button>
       </div>
 
-      {pageLoading && <p className="text-sm text-gray-400">Carregando...</p>}
-      {pageError && (
-        <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{pageError}</p>
-      )}
+      {pageLoading && <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>}
+      {pageError && <p className="ds-alert ds-alert-danger">{pageError}</p>}
 
       {!pageLoading && items.length === 0 && !pageError && (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-4xl mb-3">✓</p>
-          <p className="text-sm">Nenhuma mídia aguardando revisão.</p>
+        <div className="text-center py-16 ds-text-muted">
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <Ico d={IC.check} size={40} />
+          </div>
+          <p style={{ fontSize: 13 }}>Nenhuma mídia aguardando revisão.</p>
         </div>
       )}
 
@@ -228,26 +240,31 @@ export default function CuratorKanbanPage() {
           <button
             key={item.task_id}
             onClick={() => openModal(item)}
-            className="text-left bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-blue-400 hover:shadow-sm transition-all group"
+            className="text-left ds-card ds-hover overflow-hidden group"
+            style={{ padding: 0 }}
           >
             {/* Thumbnail do card */}
             {item.cloudinary_url ? (
               <img
                 src={item.cloudinary_url}
                 alt={item.original_filename}
-                className="w-full h-36 object-cover bg-gray-100"
+                className="w-full h-36 object-cover"
+                style={{ background: "var(--bg-card-muted)" }}
               />
             ) : (
-              <div className="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-4xl">
-                🖼
+              <div
+                className="w-full h-36 flex items-center justify-center ds-text-muted"
+                style={{ background: "var(--bg-card-muted)" }}
+              >
+                <Ico d={IC.image} size={40} />
               </div>
             )}
             <div className="p-4">
-              <p className="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-700">
+              <p className="ds-text-primary truncate" style={{ fontSize: 14, fontWeight: 600 }}>
                 {item.original_filename}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{item.mime_type}</p>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 4 }}>{item.mime_type}</p>
+              <p className="ds-text-muted" style={{ fontSize: 12, marginTop: 8 }}>
                 {item.version_history.length} versão(ões) · clique para revisar
               </p>
             </div>
@@ -257,32 +274,45 @@ export default function CuratorKanbanPage() {
 
       {/* ── Modal de revisão ── */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
+        <div
+          className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+        >
+          <div
+            className="ds-card-emphasis rounded-2xl w-full max-w-4xl my-8"
+            style={{ padding: 0, boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}
+          >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 truncate flex-1 mr-4">
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}
+            >
+              <h3 className="ds-text-primary truncate flex-1 mr-4" style={{ fontWeight: 600 }}>
                 {modal.item.original_filename}
               </h3>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                className="ds-text-muted ds-hover flex items-center justify-center rounded"
+                style={{ width: 32, height: 32 }}
+                aria-label="Fechar"
               >
-                ×
+                <Ico d={IC.close} size={18} />
               </button>
             </div>
 
             {/* Comparação lado a lado */}
-            <div className="grid grid-cols-2 gap-4 p-6 bg-gray-50">
+            <div
+              className="grid grid-cols-2 gap-4 p-6"
+              style={{ background: "var(--bg-card-muted)" }}
+            >
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Original
-                </p>
+                <p className="ds-eyebrow mb-2">Original</p>
                 {modal.item.cloudinary_url ? (
                   <img
                     src={modal.item.cloudinary_url}
                     alt="Versão original"
-                    className="w-full rounded-lg object-contain max-h-80 bg-gray-50"
+                    className="w-full rounded-lg object-contain max-h-80"
+                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }}
                   />
                 ) : (
                   <MediaViewer
@@ -292,14 +322,13 @@ export default function CuratorKanbanPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Editada
-                </p>
+                <p className="ds-eyebrow mb-2">Editada</p>
                 {modal.item.edited_cloudinary_url ? (
                   <img
                     src={modal.item.edited_cloudinary_url}
                     alt="Versão editada"
-                    className="w-full rounded-lg object-contain max-h-80 bg-gray-50"
+                    className="w-full rounded-lg object-contain max-h-80"
+                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }}
                   />
                 ) : (
                   <MediaViewer
@@ -319,25 +348,28 @@ export default function CuratorKanbanPage() {
             <div className="px-6 py-5">
               {!modal.mode && (
                 <>
-                  <p className="text-sm text-gray-600 mb-4 font-medium">Selecione uma decisão:</p>
+                  <p className="ds-text-secondary mb-4" style={{ fontSize: 14, fontWeight: 500 }}>Selecione uma decisão:</p>
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={() => setModal((m) => m && { ...m, mode: "approve" })}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      className="ds-btn ds-btn-brand"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px" }}
                     >
-                      Aprovar
+                      <Ico d={IC.check} size={15} /> Aprovar
                     </button>
                     <button
                       onClick={() => setModal((m) => m && { ...m, mode: "reject-return" })}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      className="ds-btn ds-btn-primary"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px" }}
                     >
-                      Rejeitar com retorno
+                      <Ico d={IC.arrow} size={15} /> Rejeitar com retorno
                     </button>
                     <button
                       onClick={() => setModal((m) => m && { ...m, mode: "reject-final" })}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      className="ds-btn ds-btn-danger"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px" }}
                     >
-                      Rejeição definitiva
+                      <Ico d={IC.close} size={15} /> Rejeição definitiva
                     </button>
                   </div>
                 </>
@@ -348,11 +380,12 @@ export default function CuratorKanbanPage() {
                   <div className="flex items-center gap-2 mb-3">
                     <button
                       onClick={() => setModal((m) => m && { ...m, mode: null, feedback: "", error: "", confirmFinal: false })}
-                      className="text-xs text-gray-500 hover:text-gray-700"
+                      className="ds-link"
+                      style={{ fontSize: 12 }}
                     >
                       ← Voltar
                     </button>
-                    <span className="text-sm font-semibold text-gray-800">
+                    <span className="ds-text-primary" style={{ fontSize: 14, fontWeight: 600 }}>
                       {decisionLabel[modal.mode]}
                     </span>
                   </div>
@@ -363,34 +396,33 @@ export default function CuratorKanbanPage() {
                       onChange={(e) => setModal((m) => m && { ...m, feedback: e.target.value })}
                       placeholder="Justificativa obrigatória..."
                       rows={3}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="ds-text-input w-full mb-3 resize-none"
                     />
                   )}
 
                   {modal.mode === "approve" && (
-                    <p className="text-sm text-gray-500 mb-3">
+                    <p className="ds-text-muted mb-3" style={{ fontSize: 14 }}>
                       A versão editada será aprovada e uma tarefa será criada para o publicador.
                       Versões intermediárias serão agendadas para exclusão.
                     </p>
                   )}
 
                   {modal.confirmFinal && modal.mode === "reject-final" && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-3">
-                      <p className="text-sm text-red-700 font-medium">
-                        Esta ação é irreversível. A mídia será marcada como rejeitada definitivamente
-                        e todas as versões editadas serão excluídas.
-                      </p>
+                    <div className="ds-alert ds-alert-danger mb-3">
+                      Esta ação é irreversível. A mídia será marcada como rejeitada definitivamente
+                      e todas as versões editadas serão excluídas.
                     </div>
                   )}
 
                   {modal.error && (
-                    <p className="text-xs text-red-600 mb-3">{modal.error}</p>
+                    <p className="mb-3" style={{ fontSize: 12, color: "var(--state-danger)" }}>{modal.error}</p>
                   )}
 
                   <div className="flex gap-3">
                     <button
                       onClick={closeModal}
-                      className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 ds-btn ds-btn-ghost"
+                      style={{ padding: "9px 16px" }}
                     >
                       Cancelar
                     </button>
@@ -400,9 +432,8 @@ export default function CuratorKanbanPage() {
                         modal.loading ||
                         (modal.mode !== "approve" && !modal.feedback.trim())
                       }
-                      className={`flex-1 text-white text-sm font-medium py-2 rounded-lg transition-colors disabled:bg-gray-200 disabled:text-gray-400 ${
-                        modal.mode ? decisionColor[modal.mode] : ""
-                      }`}
+                      className={`flex-1 ds-btn ${modal.mode ? decisionColor[modal.mode] : ""}`}
+                      style={{ padding: "9px 16px" }}
                     >
                       {modal.loading
                         ? "Processando..."
@@ -417,6 +448,6 @@ export default function CuratorKanbanPage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
