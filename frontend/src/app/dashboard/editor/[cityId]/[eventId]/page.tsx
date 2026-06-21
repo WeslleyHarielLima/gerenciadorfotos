@@ -75,6 +75,8 @@ export default function EditorKanbanPage() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadEditedResultItem[]>([]);
+  // Confirmação antes de enviar: preview da(s) editada(s) selecionada(s)
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; previewUrl: string }[] | null>(null);
 
   // Desistência modal
   const [abandonTarget, setAbandonTarget] = useState<TaskItem | null>(null);
@@ -97,7 +99,7 @@ export default function EditorKanbanPage() {
   }, [eventId]);
 
   // Mantém o board atualizado (silencioso; pausa durante upload/download)
-  useAutoRefresh(() => { if (eventId) loadBoard(true); }, { enabled: !uploading && !downloading });
+  useAutoRefresh(() => { if (eventId) loadBoard(true); }, { enabled: !uploading && !downloading && !pendingUpload });
 
   function toggleSelect(id: number) {
     setSelected((prev) => {
@@ -138,14 +140,27 @@ export default function EditorKanbanPage() {
     }
   }
 
-  async function handleUploadEdited(fileList: FileList | null) {
+  // Seleção de arquivos → abre o preview/confirmação (NÃO envia ainda).
+  function handleUploadEdited(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     // Snapshot dos arquivos ANTES de limpar o input: zerar uploadRef.value
     // esvazia o FileList vivo, então Array.from precisa rodar primeiro.
     const files = Array.from(fileList);
     if (uploadRef.current) uploadRef.current.value = "";
-    setUploading(true);
     setUploadResults([]);
+    setPendingUpload(files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })));
+  }
+
+  function cancelUpload() {
+    pendingUpload?.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    setPendingUpload(null);
+  }
+
+  // Confirmação → envia de fato as editadas selecionadas.
+  async function confirmUpload() {
+    if (!pendingUpload || pendingUpload.length === 0) return;
+    const files = pendingUpload.map((p) => p.file);
+    setUploading(true);
     try {
       const data = await ApiClient.uploadEdited(files);
       setUploadResults(data.results);
@@ -161,6 +176,7 @@ export default function EditorKanbanPage() {
       }]);
     } finally {
       setUploading(false);
+      cancelUpload();
     }
   }
 
@@ -406,6 +422,65 @@ export default function EditorKanbanPage() {
                 ))}
               </div>
             </section>
+          </div>
+        )}
+
+        {/* ── Modal de confirmação de envio das editadas ── */}
+        {pendingUpload && (
+          <div className="fixed inset-0 flex items-start justify-center z-50 p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.6)" }}>
+            <div className="ds-card-emphasis rounded-2xl w-full max-w-3xl my-8" style={{ padding: 0 }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                <h4 className="ds-title" style={{ fontSize: 17 }}>
+                  Confirmar envio {pendingUpload.length > 1 ? `(${pendingUpload.length} arquivos)` : ""}
+                </h4>
+                <button onClick={cancelUpload} disabled={uploading} className="ds-text-muted ds-hover flex items-center justify-center rounded" style={{ width: 32, height: 32 }} aria-label="Fechar">
+                  <Ico d={IC.close} size={18} />
+                </button>
+              </div>
+
+              <p className="ds-text-muted px-6 pt-4" style={{ fontSize: 13 }}>
+                Confira a foto editada antes de enviar para revisão do curador. O original (quando identificado pelo nome) aparece ao lado para comparação.
+              </p>
+
+              <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                {pendingUpload.map(({ file, previewUrl }, i) => {
+                  const match = board?.editing.find((t) => t.original_filename === file.name);
+                  return (
+                    <div key={i} className="ds-card rounded-lg p-4">
+                      <p className="ds-text-primary truncate mb-1" style={{ fontSize: 13, fontWeight: 600 }}>{file.name}</p>
+                      <p className="ds-text-muted mb-3" style={{ fontSize: 12 }}>{file.type || "image"} · {formatSize(file.size)}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="ds-eyebrow mb-2">Original</p>
+                          {match?.cloudinary_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={match.cloudinary_url} alt="Original" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
+                          ) : (
+                            <div className="w-full rounded-lg flex items-center justify-center ds-text-muted" style={{ height: 160, background: "var(--bg-card-muted)", border: "1px solid var(--border-subtle)", fontSize: 12, textAlign: "center", padding: 12 }}>
+                              {match ? "Sem prévia do original" : "Original não identificado pelo nome do arquivo"}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="ds-eyebrow mb-2">Editada (a enviar)</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={previewUrl} alt="Editada" className="w-full rounded-lg object-contain max-h-64" style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 px-6 py-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <button onClick={cancelUpload} disabled={uploading} className="ds-btn ds-btn-ghost flex-1" style={{ padding: "9px 16px", justifyContent: "center" }}>
+                  Cancelar
+                </button>
+                <button onClick={confirmUpload} disabled={uploading} className="ds-btn ds-btn-brand flex-1" style={{ padding: "9px 16px", justifyContent: "center", gap: 6 }}>
+                  {uploading ? "Enviando..." : (<><Ico d={IC.upload} size={15} /> Confirmar e enviar</>)}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
