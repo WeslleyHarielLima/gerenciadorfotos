@@ -53,6 +53,14 @@ export interface EventUploadStats {
   in_pool: number;
 }
 
+export interface EventMediaItem {
+  id: number;
+  original_filename: string;
+  mime_type: string;
+  status: string;
+  cloudinary_url?: string | null;
+}
+
 export interface MediaItem {
   id: number;
   original_filename: string;

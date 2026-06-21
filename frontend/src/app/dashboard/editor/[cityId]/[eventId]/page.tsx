@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiClient } from "@/lib/api";
 import { EditorBoard, MediaItem, TaskItem, UploadEditedResultItem } from "@/lib/types";
 import PhotoDrawer from "@/components/PhotoDrawer";
+import PhotoLightbox from "@/components/PhotoLightbox";
 import { IC, Ico } from "@/components/icons";
 
 const REASON_OPTIONS = [
@@ -53,6 +54,9 @@ export default function EditorKanbanPage() {
 
   // Drawer
   const [drawerMediaId, setDrawerMediaId] = useState<number | null>(null);
+
+  // Lightbox de preview/seleção (coluna Disponíveis)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Disponíveis
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -206,7 +210,7 @@ export default function EditorKanbanPage() {
               )}
 
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                {board.available.map((m: MediaItem) => (
+                {board.available.map((m: MediaItem, i: number) => (
                   <div
                     key={m.id}
                     className="ds-card ds-row-hover flex items-center gap-3 p-3 rounded-lg"
@@ -220,9 +224,9 @@ export default function EditorKanbanPage() {
                       className="h-4 w-4 rounded flex-shrink-0 cursor-pointer"
                       style={{ accentColor: "var(--brand-primary)" }}
                     />
-                    {/* Thumbnail + info — abre drawer */}
+                    {/* Thumbnail + info — abre o preview em tela cheia */}
                     <button
-                      onClick={() => setDrawerMediaId(m.id)}
+                      onClick={() => setLightboxIndex(i)}
                       className="flex items-center gap-3 flex-1 min-w-0 text-left"
                     >
                       <Thumbnail url={m.cloudinary_url} alt={m.original_filename} />
@@ -434,6 +438,20 @@ export default function EditorKanbanPage() {
       <PhotoDrawer
         mediaId={drawerMediaId}
         onClose={() => setDrawerMediaId(null)}
+      />
+
+      {/* Lightbox de preview/seleção das mídias disponíveis */}
+      <PhotoLightbox
+        items={(board?.available ?? []).map((m) => ({
+          id: m.id,
+          url: m.cloudinary_url,
+          filename: m.original_filename,
+        }))}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        selectedIds={selected}
+        onToggleSelect={toggleSelect}
       />
     </>
   );

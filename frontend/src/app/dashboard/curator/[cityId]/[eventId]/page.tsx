@@ -7,6 +7,7 @@ import { ApiClient } from "@/lib/api";
 import { ReviewItem, VersionHistoryItem } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
 import { IC, Ico } from "@/components/icons";
+import PhotoLightbox from "@/components/PhotoLightbox";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -130,6 +131,9 @@ export default function CuratorKanbanPage() {
   const [pageError, setPageError] = useState("");
 
   const [modal, setModal] = useState<ReviewModal | null>(null);
+
+  // Lightbox de comparação em tela cheia (0 = original, 1 = editada)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const loadQueue = useCallback(() => {
     setPageLoading(true);
@@ -311,8 +315,10 @@ export default function CuratorKanbanPage() {
                   <img
                     src={modal.item.cloudinary_url}
                     alt="Versão original"
+                    onClick={() => setLightboxIndex(0)}
+                    title="Ampliar"
                     className="w-full rounded-lg object-contain max-h-80"
-                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }}
+                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)", cursor: "zoom-in" }}
                   />
                 ) : (
                   <MediaViewer
@@ -327,8 +333,10 @@ export default function CuratorKanbanPage() {
                   <img
                     src={modal.item.edited_cloudinary_url}
                     alt="Versão editada"
+                    onClick={() => setLightboxIndex(1)}
+                    title="Ampliar"
                     className="w-full rounded-lg object-contain max-h-80"
-                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)" }}
+                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)", cursor: "zoom-in" }}
                   />
                 ) : (
                   <MediaViewer
@@ -448,6 +456,17 @@ export default function CuratorKanbanPage() {
           </div>
         </div>
       )}
+
+      {/* Lightbox de comparação em tela cheia (alterna original ↔ editada com ← →) */}
+      <PhotoLightbox
+        items={modal ? [
+          { id: 0, url: modal.item.cloudinary_url, filename: `Original — ${modal.item.original_filename}` },
+          { id: 1, url: modal.item.edited_cloudinary_url, filename: `Editada — ${modal.item.original_filename}` },
+        ] : []}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   );
 }

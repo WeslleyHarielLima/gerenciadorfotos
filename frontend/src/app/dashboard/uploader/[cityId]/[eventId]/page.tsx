@@ -6,7 +6,8 @@ import Link from "next/link";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
-import { Event, EventUploadStats, UploadResultItem } from "@/lib/types";
+import PhotoLightbox from "@/components/PhotoLightbox";
+import { Event, EventMediaItem, EventUploadStats, UploadResultItem } from "@/lib/types";
 
 interface FileItem {
   file: File;
@@ -23,6 +24,8 @@ export default function UploaderPage() {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [stats, setStats] = useState<EventUploadStats | null>(null);
+  const [eventMedia, setEventMedia] = useState<EventMediaItem[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [loadError, setLoadError] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -47,6 +50,7 @@ export default function UploaderPage() {
         if (!ev) { setLoadError("Evento não encontrado ou inativo."); return; }
         setEvent(ev);
         ApiClient.getEventUploadStats(eventId).then(setStats).catch(() => {});
+        ApiClient.getEventMedia(eventId).then(setEventMedia).catch(() => {});
       })
       .catch((err: Error) => setLoadError(err.message));
   }, [cityId, eventId, router]);
@@ -118,6 +122,7 @@ export default function UploaderPage() {
       );
 
       ApiClient.getEventUploadStats(event.id).then(setStats).catch(() => {});
+      ApiClient.getEventMedia(event.id).then(setEventMedia).catch(() => {});
     } catch (err) {
       setFiles((prev) =>
         prev.map((f) =>
@@ -288,8 +293,56 @@ export default function UploaderPage() {
               </div>
             </>
           )}
+
+          {/* Galeria do que já foi enviado neste evento */}
+          {eventMedia.length > 0 && (
+            <div style={{ marginTop: 32 }}>
+              <h3 className="ds-eyebrow" style={{ marginBottom: 12 }}>
+                Enviadas neste evento ({eventMedia.length})
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {eventMedia.map((m, i) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setLightboxIndex(i)}
+                    title={m.original_filename}
+                    className="ds-card ds-row-hover"
+                    style={{ padding: 0, overflow: "hidden", aspectRatio: "1 / 1", cursor: "pointer" }}
+                  >
+                    {m.cloudinary_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.cloudinary_url} alt={m.original_filename}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", background: "var(--bg-card-muted)" }}>
+                        <Ico d={IC.image} size={20} />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
+
+      {/* Lightbox de preview (apenas conferência — sem seleção) */}
+      <PhotoLightbox
+        items={eventMedia.map((m) => ({
+          id: m.id,
+          url: m.cloudinary_url,
+          filename: m.original_filename,
+        }))}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   );
 }

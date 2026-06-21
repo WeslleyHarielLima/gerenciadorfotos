@@ -1,4 +1,4 @@
-import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, EventUploadStats, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, EventMediaItem, EventUploadStats, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -120,6 +120,12 @@ export const ApiClient = {
   async getEventUploadStats(eventId: number): Promise<EventUploadStats> {
     const res = await apiFetch(`/media/event/${eventId}/upload-stats`);
     if (!res.ok) throw new Error("Erro ao carregar contador de envios.");
+    return res.json();
+  },
+
+  async getEventMedia(eventId: number): Promise<EventMediaItem[]> {
+    const res = await apiFetch(`/media/event/${eventId}/list`);
+    if (!res.ok) throw new Error("Erro ao carregar mídias do evento.");
     return res.json();
   },
 
