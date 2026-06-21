@@ -1,178 +1,98 @@
 # CHECKLIST_IMPLEMENTACAO.md — Workflow Studio
-> Status real de cada mudança decidida em 19/06/2026
-> Gerado em 21/06/2026 com base na inspeção do código-fonte
+> O que ainda precisa ser feito (mudanças da reunião de 19/06/2026)
+> Atualizado em 21/06/2026
 
 ---
 
 ## Legenda
-- ✅ Implementado e correto
-- ⚠️ Implementado parcialmente ou com diferença da especificação
-- ❌ Não implementado
-- 🔴 Ação humana obrigatória antes de prosseguir
+- 🟢 Pode ser feito agora (sem bloqueio)
+- 🔴 Bloqueado por decisão humana
+- 🔍 Verificação / operacional
 
 ---
 
-## ✅ BUG PRÉ-EXISTENTE CORRIGIDO (21/06/2026) — fora do escopo das 4 mudanças
+## MUDANÇA 1 — Cloudinary (thumbnails e URLs públicas)
 
-A migration `0010_remove_task_perceptual_hash` (não commitada / só aplicada no dev) havia **removido**
-o campo `perceptual_hash` do `Task`, mas `api/routers/media.py` ainda o usava:
-- `download_batch` — `media.py:200` cria `Task(..., perceptual_hash=...)` → **TypeError**
-- `upload-edited` (fallback visual) — `media.py:295–313` filtra/lê `perceptual_hash` → **FieldError**
+### 🟢 Código (sem bloqueio)
+- [ ] Adicionar **backoff exponencial** em `api/services/cloudinary_service.py`
+      (hoje é `try/except` simples — seguir o padrão de retry do `shared/drive.py`)
+- [ ] Criar modelo **`PendingCloudinaryUpload`** (espelhando `PendingDriveDeletion`)
+      para reenfileirar uploads que falharam, em vez de só logar e seguir
+- [ ] Migration do novo modelo `PendingCloudinaryUpload`
+- [ ] Ao falhar o upload no Cloudinary nos endpoints `upload` e `upload-edited`,
+      registrar pendência na fila em vez de descartar
+- [ ] Criar **script de retry** que processa a fila de pendências
 
-**Correção aplicada (Opção A — restaurar o campo):**
-- Campo `perceptual_hash` (BigIntegerField, nullable) restaurado em `models.py`
-- Dev DB revertido até `0009` (re-adicionou a coluna) e a migration de remoção foi **apagada do histórico**
-  — como nunca foi commitada, produção nunca a aplicou; evita um drop+readd que apagaria hashes em prod
-- Minha `0011` foi descartada e regenerada como `0010_task_parent_task` limpa (só `parent_task`)
-- Validado: `check` ok, sem migrations pendentes, `download_batch`/`upload-edited` voltam a aceitar o campo
-
-**Histórico final de migrations:** `…0009` → `0010_task_parent_task` (sem o ciclo remove/re-add).
-
----
-
-## MUDANÇA 1 — Cloudinary para thumbnails e URLs públicas
-
-### Banco de dados
-- ✅ Campo `cloudinary_url` (URLField, blank) em `Media` — `models.py:71`
-- ✅ Campo `cloudinary_public_id` (CharField, blank) em `Media` — `models.py:72`
-- ✅ Campo `cloudinary_url` em `MediaVersion` — `models.py:107`
-- ✅ Campo `cloudinary_public_id` em `MediaVersion` — `models.py:108`
-- ✅ Migrations criadas: `0008_media_cloudinary_fields`, `0009_mediaversion_cloudinary_fields`
-
-### Código — módulo Cloudinary
-- ⚠️ Módulo criado em `api/services/cloudinary_service.py` (especificação previa `shared/cloudinary.py`)
-- ⚠️ Funções implementadas como `upload_thumbnail`, `upload_version_thumbnail`, `delete_asset`
-  (especificação previa `upload_image`, `delete_image`, `get_thumbnail_url` — funcionalidade equivalente)
-- ❌ Backoff exponencial ausente — o módulo atual usa apenas `try/except` simples, sem retry progressivo como `shared/drive.py`
-
-### Código — endpoints
-- ✅ `POST /api/media/upload` chama `upload_thumbnail` após upload no Drive — `media.py:134–138`
-- ✅ Falha no Cloudinary não bloqueia o upload (try/catch silencioso com retorno `None`)
-- ✅ `POST /api/media/upload-edited` chama `upload_version_thumbnail` para versão editada — `media.py:378–382`
-
-### Código — tratamento de falha
-- ❌ Sem flag `cloudinary_pending` nos modelos
-- ❌ Sem modelo `PendingCloudinaryUpload` para enfileirar retry
-- ⚠️ Falha silenciosa sem mecanismo de recuperação — registros ficam com `cloudinary_url` vazio sem notificação
-
-### Frontend
-- ✅ Dashboard do curador (`tasks.py`) usa `cloudinary_url` via `edited_cloudinary_url` — `tasks.py:229`
-- ✅ Editor board usa `cloudinary_url` da Media — `tasks.py:59, 79, 96`
-- ✅ Publisher queue usa `cloudinary_url` — `tasks.py:411`
-
-### Ações humanas pendentes
-- 🔴 Verificar credenciais e limite do plano Cloudinary (uploads/transformações)
-- 🔴 Contar registros existentes antes de decidir sobre backfill:
-  ```bash
-  cd backend && python manage.py shell -c "
-  from core.models import Media, MediaVersion
-  print('Media total:', Media.objects.count())
-  print('Media sem cloudinary_url:', Media.objects.filter(cloudinary_url='').count())
-  print('MediaVersion total:', MediaVersion.objects.count())
-  print('MediaVersion sem cloudinary_url:', MediaVersion.objects.filter(cloudinary_url='').count())
-  "
-  ```
-- 🔴 Decidir: backfill em background ou janela de manutenção?
-- ❌ Script de backfill ainda não existe — deve ser criado após decisão acima
+### 🔴 Backfill (bloqueado)
+- [ ] Confirmar **credenciais e plano** do Cloudinary (limites de upload/transformação)
+- [ ] Contar registros **em produção** e decidir: backfill em background ou janela de manutenção
+      ```bash
+      cd backend && python manage.py shell -c "
+      from core.models import Media, MediaVersion
+      print('Media total:', Media.objects.count())
+      print('Media sem cloudinary_url:', Media.objects.filter(cloudinary_url='').count())
+      print('MediaVersion sem cloudinary_url:', MediaVersion.objects.filter(cloudinary_url='').count())
+      "
+      ```
+- [ ] Criar e rodar **script de backfill** (testar em subconjunto antes do volume completo)
 
 ---
 
-## MUDANÇA 2 — Jobs com relação pai/filho — ✅ IMPLEMENTADO (21/06/2026)
+## MUDANÇA 2 — Jobs com relação pai/filho
 
-### Banco de dados
-- ✅ Campo `parent_task` (FK `self`, nullable, `on_delete=SET_NULL`, `related_name="child_tasks"`) em `models.py`
-- ✅ Migration `0010_task_parent_task` criada e aplicada no banco dev (após limpeza do histórico — ver topo)
+### 🔍 Operacional
+- [ ] Aplicar a migration `0010_task_parent_task` em **produção** (já aplicada só no dev)
 
-### Código — endpoint
-- ✅ `POST /{task_id}/reject-with-return` agora **cria nova task** do editor (não reabre mais a existente)
-- ✅ A nova task recebe `parent_task = previous_editor_task` (cadeia editor→editor de tentativas)
-- ✅ Mantém `assigned_to` do editor anterior e propaga o feedback do curador
-
-### Admin
-- ✅ `parent_task` adicionado ao `list_display` do `TaskAdmin` + `raw_id_fields`
-- ✅ `child_tasks` acessível via related_name (cadeia visível)
-- ✅ Coluna **"Iterações"** no admin: profundidade da cadeia pai/filho por task (com proteção anti-loop)
-
-### Validação
-- ✅ `manage.py check` sem issues · `makemigrations --check` sem pendências
-- ✅ Metadados do campo verificados (SET_NULL, null=True, related_name)
-
-### Status geral: ✅ Implementado — falta aplicar a migration em PRODUÇÃO (regra #5) e commit isolado (regra #6)
+### 🟢 Opcional
+- [ ] Contador de "número de iterações por arquivo" no **dashboard admin (Fase 8)**
+      (a coluna por task já existe no `TaskAdmin`; falta a visão agregada)
 
 ---
 
 ## MUDANÇA 3 — Upload parcial (sem encerrar tarefa)
 
-### Situação atual do modelo
-- ✅ `Task.ROLE_TYPE_CHOICES` contém apenas `editor`, `curator`, `publisher` — **uploader não tem task**
-- ✅ `POST /api/media/upload` cria `Media` com status `uploaded` sem abrir nem fechar nenhuma task
-- ✅ Portanto: o backend **já suporta upload incremental** por natureza — cada arquivo é independente
+### 🔴 Decisão humana (Jair) — bloqueia o resto
+- [ ] **Decidir:** uploader e editor trabalham de forma **concorrente** ou **sequencial**?
+  - Concorrente → nenhuma mudança de backend
+  - Sequencial → criar mecanismo de "pronto para edição" (sinalização do uploader)
 
-### O que ainda precisa ser avaliado
-- 🔴 **Decisão humana obrigatória (Jair):** Editor pode pegar fotos enquanto uploader ainda envia?
-  - Se SIM (concorrente): nenhuma mudança de backend necessária
-  - Se NÃO (sequencial): precisa de mecanismo "pronto para edição" (sinalização explícita do uploader)
-- ❌ Frontend do uploader não inspecionado neste levantamento — verificar se existe indicador de "tarefa concluída" por evento que deve ser removido
-
-### Status geral: ⚠️ Backend ok, decisão de produto pendente, frontend a verificar
+### 🟢 / ⚠️ Frontend (após a decisão)
+- [ ] Inspecionar o dashboard do uploader (ainda não revisado)
+- [ ] Remover indicador de "tarefa concluída" por evento (se existir)
+- [ ] Substituir por contador incremental ("12 fotos enviadas — continuar enviando?")
+- [ ] Garantir que o botão de upload fique sempre disponível para o evento ativo
 
 ---
 
 ## MUDANÇA 4 — Múltiplos eventos no mesmo dia geram tasks individuais
 
-### calendar_sync.py
-- ✅ Chave de idempotência é `google_calendar_event_id` — `calendar_sync.py:130, 173`
-- ✅ `Event.objects.filter(google_calendar_event_id=cal_id)` é a busca de existência — correto
-- ✅ Criação usa `Event.objects.create()` com `google_calendar_event_id` único — sem agrupamento por data
-- ✅ Portanto: a lógica atual já cria um `Event` por evento do Calendar, não por `(city, event_date)`
-
-### Verificação de dados existentes (recomendada, não obrigatória)
-- ⚠️ Ainda não foi rodada a query para confirmar que dados existentes não têm agrupamento indevido:
-  ```bash
-  cd backend && python manage.py shell -c "
-  from core.models import Event
-  from django.db.models import Count
-  duplicates = Event.objects.values('event_date', 'city').annotate(total=Count('id')).filter(total__gt=1)
-  print(list(duplicates))
-  "
-  ```
-
-### Status geral: ✅ Código correto — rodar query de verificação para confirmar dados
+### 🔍 Verificação (código já está correto)
+- [ ] Rodar a query de duplicatas em **produção** (dev só tem 2 events, sem duplicatas)
+      ```bash
+      cd backend && python manage.py shell -c "
+      from core.models import Event
+      from django.db.models import Count
+      print(list(Event.objects.values('event_date','city').annotate(t=Count('id')).filter(t__gt=1)))
+      "
+      ```
+- [ ] Decidir o que fazer com a alteração local não commitada em `scripts/calendar_sync.py`
+      (refinamento do parser de cidade — não relacionado à idempotência, é WIP de alguém)
 
 ---
 
-## RESUMO EXECUTIVO
-
-| Mudança | Status | Próxima ação |
-|---------|--------|--------------|
-| Cloudinary (banco + endpoints) | ✅ Implementado | Backfill + retry mechanism |
-| Cloudinary (retry/pending) | ❌ Faltando | Implementar `PendingCloudinaryUpload` |
-| Cloudinary (backfill) | 🔴 Bloqueado | Contar registros → decisão humana → script |
-| Jobs pai/filho (migration) | ✅ Feito (0011) | Aplicar em produção |
-| Jobs pai/filho (endpoint) | ✅ Feito | — |
-| Jobs pai/filho (admin) | ✅ Feito | — |
-| Upload parcial (backend) | ✅ Já funciona | Nenhuma |
-| Upload parcial (decisão) | 🔴 Bloqueado | Jair decide concorrência uploader/editor |
-| Upload parcial (frontend) | ⚠️ A verificar | Inspecionar dashboard do uploader |
-| Eventos por Calendar ID | ✅ Correto | Rodar query de verificação nos dados |
+## OPERACIONAL / GERAL
+- [ ] Mergear/deployar o commit `b96619d` (Mudança 2 + fix do `perceptual_hash`)
+      — até lá, ambientes no HEAD anterior seguem com o bug do `perceptual_hash`
+- [ ] Toda migration deve ser testada em dev antes de aplicar em produção (regra fixa)
+- [ ] Commit separado por mudança (não agrupar tudo num PR)
 
 ---
 
-## ORDEM DE EXECUÇÃO RECOMENDADA
-
-### Imediato (sem pré-condição)
-1. **Jobs pai/filho** — migration + ajuste em `reject-with-return` + admin
-   - Menor risco, maior valor, nenhuma dependência externa
-
-### Após decisão humana
-2. **Upload parcial** — verificar frontend após Jair decidir sobre concorrência
-
-### Após contagem de registros + credenciais confirmadas
-3. **Cloudinary retry** — implementar `PendingCloudinaryUpload` ou flag `cloudinary_pending`
-4. **Script de backfill** — criar e testar em subconjunto antes de aplicar completo
-
-### Verificação (não é mudança de código)
-5. **Events query** — rodar a query SQL/Django para confirmar dados existentes
+## ORDEM SUGERIDA
+1. **Cloudinary — retry + backoff** (🟢 sem bloqueio, alto valor)
+2. **Upload parcial** (🔴 após decisão do Jair) + frontend do uploader
+3. **Cloudinary — backfill** (🔴 após credenciais + contagem em prod)
+4. **Verificações em prod** (Mudança 4 + migration da Mudança 2)
 
 ---
 
