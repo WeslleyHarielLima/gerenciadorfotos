@@ -129,6 +129,14 @@ export const ApiClient = {
     return res.json();
   },
 
+  async deleteMedia(mediaId: number): Promise<void> {
+    const res = await apiFetch(`/media/${mediaId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, "Falha ao remover a mídia."));
+    }
+  },
+
   async getEditorBoard(eventId: number): Promise<EditorBoard> {
     const res = await apiFetch(`/tasks/editor/board/${eventId}`);
     if (!res.ok) throw new Error("Erro ao carregar board do editor.");

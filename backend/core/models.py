@@ -310,6 +310,7 @@ class ScriptExecutionLog(models.Model):
 class ActivityLog(models.Model):
     ACTION_CHOICES = [
         ("uploaded", "Upload"),
+        ("deleted", "Removido"),
         ("selected", "Selecionado"),
         ("submitted", "Enviado para revisão"),
         ("approved", "Aprovado"),

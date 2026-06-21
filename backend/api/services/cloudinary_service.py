@@ -53,8 +53,8 @@ def upload_thumbnail(data: bytes, media_id: int, mime_type: str) -> dict | None:
     if mime_type not in IMAGE_MIME_TYPES:
         return None
 
-    _configure()
     try:
+        _configure()
         import cloudinary.uploader
         result = cloudinary.uploader.upload(
             io.BytesIO(data),
@@ -77,8 +77,8 @@ def upload_version_thumbnail(data: bytes, media_id: int, version: int, mime_type
     if mime_type not in IMAGE_MIME_TYPES:
         return None
 
-    _configure()
     try:
+        _configure()
         import cloudinary.uploader
         result = cloudinary.uploader.upload(
             io.BytesIO(data),

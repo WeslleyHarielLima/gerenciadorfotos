@@ -194,6 +194,60 @@ def event_media_list(request, event_id: int):
     ]
 
 
+@router.delete("/{media_id}")
+@require_role("uploader", "admin")
+def delete_media(request, media_id: int):
+    """Remove uma mídia que o uploader enviou, enquanto ainda está no pool.
+
+    Permitido apenas para mídias em status 'uploaded' (ainda não puxadas por um
+    editor). Enfileira a deleção do arquivo no Drive (limpeza offline), apaga o
+    thumbnail no Cloudinary (best-effort) e remove os registros do banco.
+    """
+    from django.db import transaction
+
+    from core.models import ActivityLog, PendingDriveDeletion
+    from api.services.cloudinary_service import delete_asset
+
+    media = get_object_or_404(Media, id=media_id)
+
+    if media.status != "uploaded":
+        raise HttpError(
+            409,
+            "Esta mídia já entrou no fluxo de edição e não pode mais ser removida pelo uploader.",
+        )
+
+    filename = media.original_filename
+    event_id = media.event_id
+
+    # Cloudinary: remove thumbnails (best-effort — não bloqueia).
+    if media.cloudinary_public_id:
+        delete_asset(media.cloudinary_public_id)
+    for v in media.versions.all():
+        if v.cloudinary_public_id:
+            delete_asset(v.cloudinary_public_id)
+
+    with transaction.atomic():
+        # Drive: enfileira deleção offline de cada arquivo das versões.
+        for v in media.versions.all():
+            if v.drive_file_id:
+                PendingDriveDeletion.objects.create(
+                    drive_file_id=v.drive_file_id,
+                    media_version=v,
+                )
+
+        ActivityLog.objects.create(
+            user=request.auth,
+            action="deleted",
+            details=f"Mídia #{media_id} ({filename}) removida do evento #{event_id} pelo uploader.",
+        )
+
+        # Versões usam on_delete=PROTECT na Media — apaga antes.
+        media.versions.all().delete()
+        media.delete()
+
+    return {"detail": "Mídia removida."}
+
+
 class DownloadBatchRequest(Schema):
     media_ids: List[int]
 

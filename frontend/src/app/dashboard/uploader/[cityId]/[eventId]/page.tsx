@@ -31,6 +31,7 @@ export default function UploaderPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [dragOver, setDragOver] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,6 +134,22 @@ export default function UploaderPage() {
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleDeleteMedia(m: EventMediaItem) {
+    if (m.status !== "uploaded" || deletingId) return;
+    if (!window.confirm(`Remover "${m.original_filename}"? Esta ação não pode ser desfeita.`)) return;
+    setDeletingId(m.id);
+    try {
+      await ApiClient.deleteMedia(m.id);
+      setEventMedia((prev) => prev.filter((x) => x.id !== m.id));
+      if (lightboxIndex !== null) setLightboxIndex(null);
+      if (event) ApiClient.getEventUploadStats(event.id).then(setStats).catch(() => {});
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Falha ao remover a mídia.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -308,23 +325,45 @@ export default function UploaderPage() {
                 }}
               >
                 {eventMedia.map((m, i) => (
-                  <button
+                  <div
                     key={m.id}
-                    onClick={() => setLightboxIndex(i)}
-                    title={m.original_filename}
                     className="ds-card ds-row-hover"
-                    style={{ padding: 0, overflow: "hidden", aspectRatio: "1 / 1", cursor: "pointer" }}
+                    style={{ position: "relative", padding: 0, overflow: "hidden", aspectRatio: "1 / 1" }}
                   >
-                    {m.cloudinary_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.cloudinary_url} alt={m.original_filename}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", background: "var(--bg-card-muted)" }}>
-                        <Ico d={IC.image} size={20} />
-                      </div>
+                    <button
+                      onClick={() => setLightboxIndex(i)}
+                      title={m.original_filename}
+                      style={{ display: "block", width: "100%", height: "100%", padding: 0, border: "none", background: "none", cursor: "pointer" }}
+                    >
+                      {m.cloudinary_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.cloudinary_url} alt={m.original_filename}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", background: "var(--bg-card-muted)" }}>
+                          <Ico d={IC.image} size={20} />
+                        </div>
+                      )}
+                    </button>
+                    {m.status === "uploaded" && (
+                      <button
+                        onClick={() => handleDeleteMedia(m)}
+                        disabled={deletingId === m.id}
+                        title="Remover esta mídia"
+                        aria-label="Remover esta mídia"
+                        style={{
+                          position: "absolute", top: 6, right: 6,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 28, height: 28, borderRadius: 8, border: "none",
+                          background: "rgba(0,0,0,0.55)", color: "#fff",
+                          cursor: deletingId === m.id ? "wait" : "pointer",
+                          opacity: deletingId === m.id ? 0.6 : 1, transition: "var(--tr)",
+                        }}
+                      >
+                        <Ico d={IC.trash} size={15} />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
