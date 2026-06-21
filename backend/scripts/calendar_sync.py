@@ -31,6 +31,8 @@ BR_STATES = {
     "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 }
 
+_IGNORE_TOKENS = {"brasil", "brazil", "br"}
+
 _STATE_RE = re.compile(r"\b([A-Z]{2})\b")
 
 
@@ -72,7 +74,7 @@ def normalize_city_name(location: str) -> tuple[str, str]:
     city = parts[-1].strip()
     for part in reversed(parts):
         stripped = part.strip()
-        if stripped and stripped not in BR_STATES and len(stripped) > 2:
+        if stripped and stripped not in BR_STATES and stripped.lower() not in _IGNORE_TOKENS and len(stripped) > 2:
             city = stripped
             break
 
