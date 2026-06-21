@@ -48,6 +48,11 @@ export interface UploadResponse {
   results: UploadResultItem[];
 }
 
+export interface EventUploadStats {
+  total: number;
+  in_pool: number;
+}
+
 export interface MediaItem {
   id: number;
   original_filename: string;

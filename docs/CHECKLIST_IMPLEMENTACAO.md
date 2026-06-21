@@ -49,18 +49,20 @@
 
 ---
 
-## MUDANÇA 3 — Upload parcial (sem encerrar tarefa)
+## MUDANÇA 3 — Upload parcial (sem encerrar tarefa) — ✅ RESOLVIDA (21/06/2026)
 
-### 🔴 Decisão humana (Jair) — bloqueia o resto
-- [ ] **Decidir:** uploader e editor trabalham de forma **concorrente** ou **sequencial**?
-  - Concorrente → nenhuma mudança de backend
-  - Sequencial → criar mecanismo de "pronto para edição" (sinalização do uploader)
+### Decisão (Jair): CONCORRENTE
+Uploader e editor trabalham em paralelo — cada foto fica disponível para o editor
+assim que sobe. Nenhuma trava sequencial; sem etapa de "finalizar".
 
-### 🟢 / ⚠️ Frontend (após a decisão)
-- [ ] Inspecionar o dashboard do uploader (ainda não revisado)
-- [ ] Remover indicador de "tarefa concluída" por evento (se existir)
-- [ ] Substituir por contador incremental ("12 fotos enviadas — continuar enviando?")
-- [ ] Garantir que o botão de upload fique sempre disponível para o evento ativo
+### Implementado
+- [x] Confirmado: backend já é concorrente (upload cria `Media status=uploaded`, sem task;
+      o board do editor já lista cada mídia `uploaded` imediatamente)
+- [x] Confirmado: a página do uploader **não tinha** indicador de "tarefa concluída" a remover
+- [x] Confirmado: botão de upload sempre disponível para o evento ativo (envio incremental)
+- [x] **Contador cumulativo persistente** ("X fotos já enviadas neste evento · Y aguardando edição")
+  - Backend: `GET /api/media/event/{id}/upload-stats` (`event_upload_stats`)
+  - Frontend: `ApiClient.getEventUploadStats` + badge na página do uploader, atualizado a cada envio
 
 ---
 
@@ -89,8 +91,8 @@
 ---
 
 ## ORDEM SUGERIDA
-1. **Cloudinary — retry + backoff** (🟢 sem bloqueio, alto valor)
-2. **Upload parcial** (🔴 após decisão do Jair) + frontend do uploader
+1. ~~**Upload parcial**~~ ✅ resolvido (concorrente + contador)
+2. **Cloudinary — retry + backoff** (🟢 sem bloqueio, alto valor)
 3. **Cloudinary — backfill** (🔴 após credenciais + contagem em prod)
 4. **Verificações em prod** (Mudança 4 + migration da Mudança 2)
 

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
-import { Event, UploadResultItem } from "@/lib/types";
+import { Event, EventUploadStats, UploadResultItem } from "@/lib/types";
 
 interface FileItem {
   file: File;
@@ -21,6 +21,7 @@ export default function UploaderPage() {
   const eventId = Number(params.eventId);
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [stats, setStats] = useState<EventUploadStats | null>(null);
   const [loadError, setLoadError] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -44,6 +45,7 @@ export default function UploaderPage() {
         const ev = events.find((e) => e.id === eventId);
         if (!ev) { setLoadError("Evento não encontrado ou inativo."); return; }
         setEvent(ev);
+        ApiClient.getEventUploadStats(eventId).then(setStats).catch(() => {});
       })
       .catch((err: Error) => setLoadError(err.message));
   }, [cityId, eventId, router]);
@@ -113,6 +115,8 @@ export default function UploaderPage() {
           };
         }),
       );
+
+      ApiClient.getEventUploadStats(event.id).then(setStats).catch(() => {});
     } catch (err) {
       setFiles((prev) =>
         prev.map((f) =>
@@ -144,7 +148,16 @@ export default function UploaderPage() {
 
       <h2 className="text-xl font-semibold text-gray-800 mb-1">Enviar fotos/vídeos</h2>
       {event && (
-        <p className="text-sm text-gray-500 mb-6">{event.name}</p>
+        <p className="text-sm text-gray-500 mb-2">{event.name}</p>
+      )}
+      {stats && (
+        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm px-3 py-1.5 rounded-lg mb-6">
+          <span className="font-semibold">{stats.total}</span>
+          foto{stats.total !== 1 ? "s" : ""} já enviada{stats.total !== 1 ? "s" : ""} neste evento
+          {stats.in_pool > 0 && (
+            <span className="text-blue-500">· {stats.in_pool} aguardando edição</span>
+          )}
+        </div>
       )}
 
       {loadError && (

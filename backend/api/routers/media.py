@@ -147,6 +147,20 @@ def upload_media(
     return UploadResponse(results=results)
 
 
+class EventUploadStats(Schema):
+    total: int
+    in_pool: int
+
+
+@router.get("/event/{event_id}/upload-stats", response=EventUploadStats)
+@require_role("uploader", "admin")
+def event_upload_stats(request, event_id: int):
+    """Contador cumulativo de mídias já enviadas neste evento (persiste entre sessões)."""
+    event = get_object_or_404(Event, id=event_id)
+    qs = Media.objects.filter(event=event)
+    return EventUploadStats(total=qs.count(), in_pool=qs.filter(status="uploaded").count())
+
+
 class DownloadBatchRequest(Schema):
     media_ids: List[int]
 

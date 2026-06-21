@@ -1,4 +1,4 @@
-import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, EventUploadStats, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -115,6 +115,12 @@ export const ApiClient = {
     }
 
     return { results: allResults };
+  },
+
+  async getEventUploadStats(eventId: number): Promise<EventUploadStats> {
+    const res = await apiFetch(`/media/event/${eventId}/upload-stats`);
+    if (!res.ok) throw new Error("Erro ao carregar contador de envios.");
+    return res.json();
   },
 
   async getEditorBoard(eventId: number): Promise<EditorBoard> {
