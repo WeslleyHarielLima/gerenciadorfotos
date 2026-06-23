@@ -132,6 +132,7 @@ export interface PublishItem {
   mime_type: string;
   cloudinary_url?: string | null;
   proxy_url: string;
+  original_proxy_url: string;
   event_name: string;
   city_name: string;
   event_id: number;

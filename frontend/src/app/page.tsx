@@ -114,11 +114,9 @@ export default function LoginPage() {
   /* ── styles helpers ─ */
   const S = {
     page: {
-      height: "100vh",
       display: "flex",
       alignItems: "stretch",
       position: "relative",
-      overflow: "hidden",
     } as React.CSSProperties,
 
     bg: {
@@ -439,7 +437,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={S.page}>
+    <div className="login-page" style={S.page}>
 
       {/* Fundo */}
       <div style={S.bg}>
@@ -455,7 +453,7 @@ export default function LoginPage() {
       <div style={S.divider} />
 
       {/* Coluna esquerda — identidade do candidato */}
-      <div style={S.colLeft}>
+      <div className="login-identity">
         <div style={S.candName}>
           <span style={{ display: "block" }}>Wiveslando</span>
           <span style={{ display: "block" }}>Neiva</span>
@@ -469,7 +467,7 @@ export default function LoginPage() {
       </div>
 
       {/* Coluna direita — card de login */}
-      <div style={S.colRight}>
+      <div className="login-card-col">
         <div style={S.card}>
           <div style={S.cardTopLine} />
 
@@ -588,7 +586,7 @@ export default function LoginPage() {
       </div>
 
       {/* Rodapé */}
-      <div style={S.footer}>
+      <div className="login-footer" style={S.footer}>
         <div style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
           Wiveslando Neiva · Campanha 2026
         </div>

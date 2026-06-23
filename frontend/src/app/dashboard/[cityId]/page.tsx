@@ -53,7 +53,7 @@ export default function EventsPage() {
   }, [cityId, router]);
 
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
+    <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
       <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
         <Link href="/dashboard">Início</Link>
         <span className="sep">›</span>

@@ -378,3 +378,146 @@ body {
   color: var(--text-on-brand);
   font-weight: 700;
 }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVO — moldura, login e ergonomia de toque
+   Adicionado no redesign responsivo. Não altera nenhuma função:
+   controla apenas layout/estrutura por breakpoint.
+   Breakpoint mobile: <= 767px.  Tablet/desktop: >= 768px.
+══════════════════════════════════════════════════════════ */
+
+/* ── Shell / moldura ──────────────────────────────────── */
+.shell-root {
+  display: flex;
+  height: 100vh;
+  height: 100dvh; /* evita o "pulo" da barra de URL no mobile */
+  overflow: hidden;
+  background: var(--bg-app);
+}
+.shell-sidebar {
+  width: var(--sidebar-w, 240px);
+  min-width: var(--sidebar-w, 240px);
+  max-width: var(--sidebar-w, 240px);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 50;
+  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.shell-hamburger { display: none; }
+.shell-overlay { display: none; }
+
+@media (max-width: 767px) {
+  /* Sidebar vira gaveta (off-canvas) deslizante sobre overlay */
+  .shell-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-notif);
+  }
+  .shell-sidebar[data-open="true"] { transform: translateX(0); }
+  /* O botão de recolher (chevron) não faz sentido no mobile */
+  .shell-collapse-btn { display: none !important; }
+  /* Hambúrguer aparece na topbar */
+  .shell-hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Overlay escuro atrás da gaveta */
+  .shell-overlay[data-open="true"] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: var(--bg-overlay);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+}
+
+/* ── Login responsivo ─────────────────────────────────── */
+.login-page {
+  height: 100dvh;
+  overflow: hidden;
+}
+.login-identity {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 0 60px 7%;
+}
+.login-card-col {
+  width: 400px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+}
+
+@media (max-width: 820px) {
+  /* Empilha identidade + card; card ocupa a largura toda */
+  .login-page {
+    flex-direction: column;
+    overflow-y: auto;
+    height: auto;
+    min-height: 100dvh;
+  }
+  .login-identity {
+    flex: none;
+    align-items: center;
+    text-align: center;
+    padding: 44px 24px 8px;
+  }
+  .login-card-col {
+    width: 100%;
+    padding: 8px 18px 32px;
+  }
+  /* Rodapé absoluto sobreporia o card no mobile — oculta */
+  .login-footer { display: none !important; }
+}
+
+/* ── Ergonomia de toque (mobile) ──────────────────────── */
+@media (max-width: 767px) {
+  /* Fonte >= 16px evita o zoom automático do iOS ao focar input */
+  .ds-input-wrap input,
+  .ds-text-input,
+  .ds-select { font-size: 16px !important; }
+  /* Alvo de toque mínimo confortável */
+  .ds-btn { min-height: 44px; }
+  /* Menos respiro lateral nas páginas em telas estreitas */
+  .page-pad { padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* Lightbox: a foto ocupa a largura total do device; setas sobrepõem
+     a imagem (em vez de espremê-la) e a navegação também é por swipe. */
+  .lightbox-body { padding: 0 !important; gap: 0 !important; }
+  .lightbox-stage { width: 100%; }
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    background: rgba(0, 0, 0, 0.45) !important;
+    border-color: transparent !important;
+  }
+  .lightbox-nav-prev { left: 6px; }
+  .lightbox-nav-next { right: 6px; }
+}

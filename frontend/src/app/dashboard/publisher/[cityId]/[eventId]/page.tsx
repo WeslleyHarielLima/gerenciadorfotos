@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
 import { PublishHistoryGroup, PublishItem } from "@/lib/types";
+import { downloadProxyFile } from "@/lib/download";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 function formatSize(bytes: number): string {
@@ -45,6 +46,7 @@ export default function PublisherKanbanPage() {
   const [pageError, setPageError] = useState("");
 
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [downloading, setDownloading] = useState<"" | "publish" | "original">("");
 
   const loadQueue = useCallback((silent = false) => {
     if (!silent) setLoading(true);
@@ -75,6 +77,20 @@ export default function PublisherKanbanPage() {
     { enabled: !confirm },
   );
 
+  async function handleDownload(which: "publish" | "original") {
+    if (!confirm || downloading) return;
+    setDownloading(which);
+    try {
+      const url = which === "publish" ? confirm.item.proxy_url : confirm.item.original_proxy_url;
+      const name = which === "publish" ? confirm.item.original_filename : `original-${confirm.item.original_filename}`;
+      await downloadProxyFile(url, name);
+    } catch {
+      alert("Falha ao baixar o arquivo. Tente novamente.");
+    } finally {
+      setDownloading("");
+    }
+  }
+
   async function handlePublish() {
     if (!confirm) return;
     setConfirm((c) => c && { ...c, loading: true, error: "" });
@@ -91,7 +107,7 @@ export default function PublisherKanbanPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
+    <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Breadcrumb */}
       <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
         <Link href="/dashboard">Início</Link>
@@ -299,6 +315,30 @@ export default function PublisherKanbanPage() {
               {confirm.error && (
                 <p className="ds-alert ds-alert-danger" style={{ marginBottom: 12 }}>{confirm.error}</p>
               )}
+
+              {/* Downloads: versão a publicar + original */}
+              <div className="flex gap-2" style={{ marginBottom: 12 }}>
+                <button
+                  onClick={() => handleDownload("publish")}
+                  disabled={downloading !== "" || confirm.loading}
+                  className="ds-btn ds-btn-ghost flex-1 flex items-center justify-center"
+                  style={{ padding: "8px 10px", gap: 6, fontSize: 12 }}
+                >
+                  <Ico d={IC.download} size={14} />
+                  {downloading === "publish" ? "Baixando…" : "Baixar (a publicar)"}
+                </button>
+                {confirm.item.original_proxy_url && (
+                  <button
+                    onClick={() => handleDownload("original")}
+                    disabled={downloading !== "" || confirm.loading}
+                    className="ds-btn ds-btn-ghost flex-1 flex items-center justify-center"
+                    style={{ padding: "8px 10px", gap: 6, fontSize: 12 }}
+                  >
+                    <Ico d={IC.download} size={14} />
+                    {downloading === "original" ? "Baixando…" : "Baixar original"}
+                  </button>
+                )}
+              </div>
 
               <div className="flex gap-3">
                 <button

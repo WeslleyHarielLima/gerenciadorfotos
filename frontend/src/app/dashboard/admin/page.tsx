@@ -77,7 +77,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
         <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>
       </div>
     );
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
         <p className="ds-alert ds-alert-danger">{error}</p>
       </div>
     );
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
   const hasBottlenecks = (bottlenecks?.bottlenecks.length ?? 0) > 0;
 
   return (
-    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px", display: "flex", flexDirection: "column", gap: 36 }}>
+    <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px", display: "flex", flexDirection: "column", gap: 36 }}>
       {/* Cabeçalho */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <h2 className="ds-title">Painel Admin</h2>

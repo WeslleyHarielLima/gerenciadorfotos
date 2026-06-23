@@ -265,5 +265,17 @@ export const ApiClient = {
     return `${BASE}/media/proxy/${driveFileId}`;
   },
 
+  // Baixa o arquivo completo servido pelo proxy do Drive (com auth/refresh).
+  // Aceita um caminho como "/api/media/proxy/<id>" (formato vindo da API).
+  async downloadProxy(proxyUrl: string): Promise<Blob> {
+    const path = proxyUrl.replace(/^\/api/, "");
+    const res = await apiFetch(path);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, "Falha no download."));
+    }
+    return res.blob();
+  },
+
   fetch: apiFetch,
 };

@@ -89,9 +89,13 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const nav = navForRole(user.role);
   const W = expanded ? 240 : 72;
+
+  // Fecha a gaveta mobile ao trocar de rota
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   useEffect(() => {
     const stored = (localStorage.getItem("wf_theme") as "dark" | "light" | null) ?? "dark";
@@ -107,22 +111,12 @@ export default function DashboardShell({
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg-app)" }}>
+    <div className="shell-root">
       {/* ── SIDEBAR ─────────────────────────────────────── */}
       <aside
-        style={{
-          width: W,
-          minWidth: W,
-          maxWidth: W,
-          background: "var(--bg-sidebar)",
-          borderRight: "1px solid var(--border-default)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          transition: "width 220ms cubic-bezier(0.4,0,0.2,1), min-width 220ms, max-width 220ms",
-          position: "relative",
-          zIndex: 10,
-        }}
+        className="shell-sidebar"
+        data-open={mobileOpen}
+        style={{ "--sidebar-w": `${W}px` } as React.CSSProperties}
       >
         {/* Marca */}
         <div
@@ -145,7 +139,7 @@ export default function DashboardShell({
                   <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Campanha 2026</div>
                 </div>
               </div>
-              <button onClick={() => setExpanded(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 4, borderRadius: 6, flexShrink: 0 }} aria-label="Recolher menu">
+              <button className="shell-collapse-btn" onClick={() => setExpanded(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 4, borderRadius: 6, flexShrink: 0 }} aria-label="Recolher menu">
                 <Ico d={IC.chevL} size={16} />
               </button>
             </>
@@ -193,6 +187,9 @@ export default function DashboardShell({
         </div>
       </aside>
 
+      {/* Overlay da gaveta — só aparece no mobile quando aberta */}
+      <div className="shell-overlay" data-open={mobileOpen} onClick={() => setMobileOpen(false)} />
+
       {/* ── ÁREA PRINCIPAL ──────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Topbar */}
@@ -211,6 +208,14 @@ export default function DashboardShell({
             zIndex: 20,
           }}
         >
+          <button
+            className="shell-hamburger"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir menu"
+            style={{ width: 36, height: 36, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", borderRadius: 8, marginRight: 2 }}
+          >
+            <Ico d={IC.menu} size={20} />
+          </button>
           <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{titleFromPath(pathname)}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button

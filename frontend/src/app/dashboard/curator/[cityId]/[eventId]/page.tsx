@@ -8,6 +8,7 @@ import { ReviewItem, VersionHistoryItem } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
 import { IC, Ico } from "@/components/icons";
 import PhotoLightbox from "@/components/PhotoLightbox";
+import { downloadProxyFile } from "@/lib/download";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -139,6 +140,9 @@ export default function CuratorKanbanPage() {
   // Lightbox de comparação em tela cheia (0 = original, 1 = editada)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Qual versão está sendo baixada ("" = nenhuma)
+  const [downloading, setDownloading] = useState<"" | "original" | "edited">("");
+
   const loadQueue = useCallback((silent = false) => {
     if (!silent) setPageLoading(true);
     ApiClient.getReviewQueue()
@@ -167,6 +171,20 @@ export default function CuratorKanbanPage() {
 
   function closeModal() {
     setModal(null);
+  }
+
+  async function handleDownload(which: "original" | "edited") {
+    if (!modal || downloading) return;
+    setDownloading(which);
+    try {
+      const url = which === "original" ? modal.item.original_proxy_url : modal.item.edited_proxy_url;
+      const name = which === "original" ? modal.item.original_filename : `editada-${modal.item.original_filename}`;
+      await downloadProxyFile(url, name);
+    } catch {
+      alert("Falha ao baixar o arquivo. Tente novamente.");
+    } finally {
+      setDownloading("");
+    }
   }
 
   async function handleDecision() {
@@ -220,7 +238,7 @@ export default function CuratorKanbanPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+    <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Breadcrumb */}
       <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
         <Link href="/dashboard">Início</Link>
@@ -329,11 +347,24 @@ export default function CuratorKanbanPage() {
 
             {/* Comparação lado a lado */}
             <div
-              className="grid grid-cols-2 gap-4 p-6"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6"
               style={{ background: "var(--bg-card-muted)" }}
             >
               <div>
-                <p className="ds-eyebrow mb-2">Original</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="ds-eyebrow">Original</p>
+                  {modal.item.original_proxy_url && (
+                    <button
+                      onClick={() => handleDownload("original")}
+                      disabled={downloading !== ""}
+                      className="ds-link inline-flex items-center"
+                      style={{ fontSize: 12, gap: 4, background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      <Ico d={IC.download} size={13} />
+                      {downloading === "original" ? "Baixando…" : "Baixar"}
+                    </button>
+                  )}
+                </div>
                 {modal.item.cloudinary_url ? (
                   <img
                     src={modal.item.cloudinary_url}
@@ -351,7 +382,20 @@ export default function CuratorKanbanPage() {
                 )}
               </div>
               <div>
-                <p className="ds-eyebrow mb-2">Editada</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="ds-eyebrow">Editada</p>
+                  {modal.item.edited_proxy_url && (
+                    <button
+                      onClick={() => handleDownload("edited")}
+                      disabled={downloading !== ""}
+                      className="ds-link inline-flex items-center"
+                      style={{ fontSize: 12, gap: 4, background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      <Ico d={IC.download} size={13} />
+                      {downloading === "edited" ? "Baixando…" : "Baixar"}
+                    </button>
+                  )}
+                </div>
                 {modal.item.edited_cloudinary_url ? (
                   <img
                     src={modal.item.edited_cloudinary_url}

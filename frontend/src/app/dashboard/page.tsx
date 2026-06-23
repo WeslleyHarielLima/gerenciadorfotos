@@ -41,6 +41,7 @@ export default function CitiesPage() {
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const { user } = loadAuth();
@@ -63,8 +64,12 @@ export default function CitiesPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
+  const filteredCities = cities.filter((c) =>
+    `${c.name} ${c.state}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
+    <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Em andamento */}
       <section style={{ marginBottom: 36 }}>
         <h3 className="ds-eyebrow" style={{ marginBottom: 12 }}>Em andamento</h3>
@@ -117,8 +122,32 @@ export default function CitiesPage() {
           <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma cidade com eventos ativos no momento.</p>
         )}
 
+        {/* Campo de busca de cidades */}
+        {cities.length > 0 && (
+          <div className="ds-input-wrap" style={{ maxWidth: 360, height: 40, padding: "0 12px", marginBottom: 16, gap: 8 }}>
+            <Ico d={IC.search} size={16} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar cidade..."
+              aria-label="Buscar cidade"
+              style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--text-primary)", fontSize: 13, fontFamily: "inherit" }}
+            />
+            {query && (
+              <button onClick={() => setQuery("")} aria-label="Limpar busca" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 0 }}>
+                <Ico d={IC.close} size={14} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {!loading && !error && cities.length > 0 && filteredCities.length === 0 && (
+          <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma cidade encontrada para “{query}”.</p>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-          {cities.map((city) => (
+          {filteredCities.map((city) => (
             <Link
               key={city.id}
               href={`/dashboard/${city.id}`}

@@ -436,6 +436,7 @@ class PublishItemSchema(Schema):
     mime_type: str
     cloudinary_url: Optional[str] = None
     proxy_url: str
+    original_proxy_url: str = ""
     event_name: str
     city_name: str
     event_id: int
@@ -488,6 +489,11 @@ def publish_queue(request):
         event = media.event
         city = event.city
 
+        original_version = media.versions.filter(status="original").order_by("version").first()
+        original_proxy = (
+            f"/api/media/proxy/{original_version.drive_file_id}" if original_version else ""
+        )
+
         items.append(PublishItemSchema(
             task_id=task.id,
             media_id=media.id,
@@ -496,6 +502,7 @@ def publish_queue(request):
             # Mostra a versão editada/aprovada (a que será publicada), não a original.
             cloudinary_url=version.cloudinary_url or media.cloudinary_url or None,
             proxy_url=f"/api/media/proxy/{version.drive_file_id}",
+            original_proxy_url=original_proxy,
             event_name=event.name,
             city_name=str(city),
             event_id=event.id,

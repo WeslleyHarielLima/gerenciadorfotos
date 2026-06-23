@@ -209,7 +209,7 @@ export default function EditorKanbanPage() {
 
   return (
     <>
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
         {/* Breadcrumb */}
         <nav className="ds-breadcrumb" style={{ marginBottom: 22 }}>
           <Link href="/dashboard">Início</Link>

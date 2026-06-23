@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { IC, Ico } from "@/components/icons";
 
 export interface LightboxItem {
@@ -37,6 +37,9 @@ export default function PhotoLightbox({
   const item = open ? items[index] : null;
   const selectable = !!onToggleSelect;
   const isSelected = !!(item && selectedIds?.has(item.id));
+
+  // Swipe horizontal para navegar entre fotos (mobile)
+  const touchStartX = useRef<number | null>(null);
 
   const goPrev = useCallback(() => {
     if (index === null) return;
@@ -119,19 +122,27 @@ export default function PhotoLightbox({
       {/* Corpo: setas + imagem */}
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0 8px 8px", minHeight: 0 }}
+        onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return;
+          const dx = e.changedTouches[0].clientX - touchStartX.current;
+          touchStartX.current = null;
+          if (Math.abs(dx) > 50) { if (dx < 0) goNext(); else goPrev(); }
+        }}
+        className="lightbox-body"
+        style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "0 8px 8px", minHeight: 0 }}
       >
         <button
           onClick={goPrev}
           disabled={!hasPrev}
           aria-label="Anterior"
-          className="ds-btn ds-btn-ghost"
+          className="ds-btn ds-btn-ghost lightbox-nav lightbox-nav-prev"
           style={{ padding: 10, opacity: hasPrev ? 1 : 0.3, color: "var(--text-on-brand, #fff)" }}
         >
           <Ico d={IC.chevL} size={26} />
         </button>
 
-        <div style={{ flex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 0 }}>
+        <div className="lightbox-stage" style={{ flex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 0 }}>
           {item.url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -159,7 +170,7 @@ export default function PhotoLightbox({
           onClick={goNext}
           disabled={!hasNext}
           aria-label="Próxima"
-          className="ds-btn ds-btn-ghost"
+          className="ds-btn ds-btn-ghost lightbox-nav lightbox-nav-next"
           style={{ padding: 10, opacity: hasNext ? 1 : 0.3, color: "var(--text-on-brand, #fff)" }}
         >
           <Ico d={IC.chevR} size={26} />
