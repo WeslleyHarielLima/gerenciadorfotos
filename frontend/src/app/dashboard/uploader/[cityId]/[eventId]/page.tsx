@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
@@ -159,18 +159,7 @@ export default function UploaderPage() {
 
   return (
     <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
-      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
-        <Link href="/dashboard">Início</Link>
-        <span className="sep">›</span>
-        <Link href={`/dashboard/${cityId}`}>{event?.city_name ?? "Cidade"}</Link>
-        <span className="sep">›</span>
-        <span className="current">{event?.name ?? "Evento"}</span>
-      </nav>
-
-      <h2 className="ds-title" style={{ marginBottom: 6 }}>Enviar fotos/vídeos</h2>
-      {event && (
-        <p className="ds-text-muted" style={{ fontSize: 13, marginBottom: 12 }}>{event.name}</p>
-      )}
+      <PageHeader title="Enviar fotos" subtitle={event?.name} backHref={`/dashboard/${cityId}`} />
       {stats && (
         <div className="ds-badge ds-badge-info" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 24 }}>
           <span style={{ fontWeight: 700 }}>{stats.total}</span>

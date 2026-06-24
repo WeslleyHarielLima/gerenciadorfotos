@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { ApiClient } from "@/lib/api";
 import { ReviewItem, VersionHistoryItem } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth";
@@ -145,11 +145,11 @@ export default function CuratorKanbanPage() {
 
   const loadQueue = useCallback((silent = false) => {
     if (!silent) setPageLoading(true);
-    ApiClient.getReviewQueue()
+    ApiClient.getReviewQueue(eventId)
       .then((data) => setItems(data.items))
       .catch((e: Error) => setPageError(e.message))
       .finally(() => { if (!silent) setPageLoading(false); });
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     loadQueue();
@@ -240,13 +240,7 @@ export default function CuratorKanbanPage() {
   return (
     <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Breadcrumb */}
-      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
-        <Link href="/dashboard">Início</Link>
-        <span className="sep">›</span>
-        <Link href={`/dashboard/${cityId}`}>Cidade</Link>
-        <span className="sep">›</span>
-        <span className="current">Revisão do Curador</span>
-      </nav>
+      <PageHeader title="Revisar fotos" backHref={`/dashboard/${cityId}`} />
 
       <div className="flex items-center justify-between" style={{ marginBottom: 22 }}>
         <h2 className="ds-title" style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>

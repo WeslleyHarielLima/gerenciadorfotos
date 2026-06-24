@@ -410,41 +410,55 @@ body {
               max-width 220ms cubic-bezier(0.4, 0, 0.2, 1),
               transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-.shell-hamburger { display: none; }
-.shell-overlay { display: none; }
+/* Barra de abas inferior (mobile) — oculta no desktop */
+.bottom-nav { display: none; }
+
+/* Logo na topbar: só no mobile (no desktop a sidebar já mostra a marca) */
+.shell-topbar-logo { display: none; align-items: center; }
+
+/* Área de conteúdo rolável (a barra de abas fica fixa por fora dela) */
+.shell-main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 
 @media (max-width: 767px) {
-  /* Sidebar vira gaveta (off-canvas) deslizante sobre overlay */
-  .shell-sidebar {
+  /* No mobile a navegação é a barra de abas inferior — a sidebar some */
+  .shell-sidebar { display: none !important; }
+  /* Topbar mostra só o título; conta/tema migram para a aba Perfil */
+  .shell-topbar-actions { display: none !important; }
+  /* A marca aparece na topbar (a sidebar está oculta no mobile) */
+  .shell-topbar-logo { display: inline-flex; }
+  /* Espaço para a barra de abas não cobrir a última cidade/conteúdo */
+  .shell-main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+
+  /* Barra de abas fixa no rodapé */
+  .bottom-nav {
+    display: flex;
     position: fixed;
-    top: 0;
     left: 0;
-    height: 100%;
-    width: 280px !important;
-    min-width: 280px !important;
-    max-width: 280px !important;
-    transform: translateX(-100%);
-    box-shadow: var(--shadow-notif);
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-default);
   }
-  .shell-sidebar[data-open="true"] { transform: translateX(0); }
-  /* O botão de recolher (chevron) não faz sentido no mobile */
-  .shell-collapse-btn { display: none !important; }
-  /* Hambúrguer aparece na topbar */
-  .shell-hamburger {
-    display: inline-flex;
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 3px;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    transition: color var(--tr);
   }
-  /* Overlay escuro atrás da gaveta */
-  .shell-overlay[data-open="true"] {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    background: var(--bg-overlay);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
-  }
+  .bottom-nav-item[data-active="true"] { color: var(--brand-primary); }
 }
 
 /* ── Login responsivo ─────────────────────────────────── */

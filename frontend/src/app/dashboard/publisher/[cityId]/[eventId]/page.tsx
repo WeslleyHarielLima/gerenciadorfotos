@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
 import { PublishHistoryGroup, PublishItem } from "@/lib/types";
@@ -51,11 +51,11 @@ export default function PublisherKanbanPage() {
   const loadQueue = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     setPageError("");
-    ApiClient.getPublishQueue()
+    ApiClient.getPublishQueue(eventId)
       .then((data) => setQueue(data.items))
       .catch((e: Error) => setPageError(e.message))
       .finally(() => { if (!silent) setLoading(false); });
-  }, []);
+  }, [eventId]);
 
   const loadHistory = useCallback((silent = false) => {
     if (!silent) setLoading(true);
@@ -109,13 +109,7 @@ export default function PublisherKanbanPage() {
   return (
     <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
       {/* Breadcrumb */}
-      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
-        <Link href="/dashboard">Início</Link>
-        <span className="sep">›</span>
-        <Link href={`/dashboard/${cityId}`}>Cidade</Link>
-        <span className="sep">›</span>
-        <span className="current">Publicador</span>
-      </nav>
+      <PageHeader title="Publicar fotos" backHref={`/dashboard/${cityId}`} />
 
       <div className="flex items-center justify-between" style={{ marginBottom: 22 }}>
         <h2 className="ds-title">Publicação</h2>

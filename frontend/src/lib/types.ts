@@ -125,6 +125,32 @@ export interface ReviewList {
   items: ReviewItem[];
 }
 
+export interface ReviewCityCount {
+  city_id: number;
+  count: number;
+}
+
+export interface ReviewEventCount {
+  event_id: number;
+  count: number;
+}
+
+export interface ReviewSummary {
+  total: number;
+  active_events: number;
+  cities: ReviewCityCount[];
+  events: ReviewEventCount[];
+}
+
+/** Resumo de trabalho pendente por papel (editor/curador/publicador). */
+export interface WorkSummary {
+  role: string;
+  total: number;
+  active_events: number;
+  cities: ReviewCityCount[];
+  events: ReviewEventCount[];
+}
+
 export interface PublishItem {
   task_id: number;
   media_id: number;

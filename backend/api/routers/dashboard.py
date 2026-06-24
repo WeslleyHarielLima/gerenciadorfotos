@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date
 from typing import List, Optional
 
@@ -5,7 +6,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
 
-from core.models import City, Event, Task
+from core.models import City, Event, Media, Task
 
 router = Router(tags=["dashboard"])
 
@@ -96,3 +97,61 @@ def active_tasks(request):
             city_name=str(event.city),
         ))
     return result
+
+
+# ── Resumo de trabalho por papel (badges/contador) ────────────────────────────
+
+class WorkCityCount(Schema):
+    city_id: int
+    count: int
+
+
+class WorkEventCount(Schema):
+    event_id: int
+    count: int
+
+
+class WorkSummaryOut(Schema):
+    role: str
+    total: int
+    active_events: int
+    cities: List[WorkCityCount]
+    events: List[WorkEventCount]
+
+
+@router.get("/work-summary", response=WorkSummaryOut)
+def work_summary(request):
+    """Contagem de trabalho pendente do usuário, agrupada por cidade e evento.
+
+    - curador/publicador: tasks pendentes atribuídas a ele.
+    - editor: pool de mídias aguardando edição (status "uploaded").
+    - uploader/admin: sem fila (retorna vazio).
+
+    Alimenta os badges de notificação (Cidades/Eventos) e o contador do Início.
+    """
+    user = request.auth
+    role = getattr(user, "role", "")
+    by_city = defaultdict(int)
+    by_event = defaultdict(int)
+
+    if role in ("curator", "publisher"):
+        tasks = Task.objects.select_related(
+            "media_version__media__event"
+        ).filter(assigned_to=user, role_type=role, status="pending")
+        for t in tasks:
+            event = t.media_version.media.event
+            by_city[event.city_id] += 1
+            by_event[event.id] += 1
+    elif role == "editor":
+        for media in Media.objects.select_related("event").filter(status="uploaded"):
+            event = media.event
+            by_city[event.city_id] += 1
+            by_event[event.id] += 1
+
+    return WorkSummaryOut(
+        role=role,
+        total=sum(by_event.values()),
+        active_events=len(by_event),
+        cities=[WorkCityCount(city_id=cid, count=c) for cid, c in by_city.items()],
+        events=[WorkEventCount(event_id=eid, count=c) for eid, c in by_event.items()],
+    )

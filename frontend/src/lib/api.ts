@@ -1,4 +1,4 @@
-import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, EventMediaItem, EventUploadStats, PublishHistory, PublishList, RefreshResponse, ReviewList, UploadEditedResponse, UploadResponse, User } from "@/lib/types";
+import { ActiveTask, AdminOverview, AuthResponse, BottlenecksResponse, City, EditorBoard, Event, EventMediaItem, EventUploadStats, PublishHistory, PublishList, RefreshResponse, ReviewList, ReviewSummary, UploadEditedResponse, UploadResponse, User, WorkSummary } from "@/lib/types";
 import { clearAuth, getAccessToken, getRefreshToken, saveAuth } from "@/lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
@@ -183,9 +183,22 @@ export const ApiClient = {
     }
   },
 
-  async getReviewQueue(): Promise<ReviewList> {
-    const res = await apiFetch("/tasks/review");
+  async getReviewQueue(eventId?: number): Promise<ReviewList> {
+    const query = eventId ? `?event_id=${eventId}` : "";
+    const res = await apiFetch(`/tasks/review${query}`);
     if (!res.ok) throw new Error("Erro ao carregar fila de revisão.");
+    return res.json();
+  },
+
+  async getReviewSummary(): Promise<ReviewSummary> {
+    const res = await apiFetch("/tasks/review/summary");
+    if (!res.ok) throw new Error("Erro ao carregar resumo de revisão.");
+    return res.json();
+  },
+
+  async getWorkSummary(): Promise<WorkSummary> {
+    const res = await apiFetch("/dashboard/work-summary");
+    if (!res.ok) throw new Error("Erro ao carregar resumo de trabalho.");
     return res.json();
   },
 
@@ -221,8 +234,9 @@ export const ApiClient = {
     }
   },
 
-  async getPublishQueue(): Promise<PublishList> {
-    const res = await apiFetch("/tasks/publish");
+  async getPublishQueue(eventId?: number): Promise<PublishList> {
+    const query = eventId ? `?event_id=${eventId}` : "";
+    const res = await apiFetch(`/tasks/publish${query}`);
     if (!res.ok) throw new Error("Erro ao carregar fila de publicação.");
     return res.json();
   },

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { loadAuth } from "@/lib/auth";
 import { ApiClient } from "@/lib/api";
 import { IC, Ico } from "@/components/icons";
@@ -31,6 +32,7 @@ export default function EventsPage() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [workByEvent, setWorkByEvent] = useState<Record<number, number>>({});
 
   useEffect(() => {
     const { user } = loadAuth();
@@ -50,19 +52,21 @@ export default function EventsPage() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
+    // Editor/Curador/Publicador: contagem de trabalho pendente por evento (badge)
+    if (["editor", "curator", "publisher"].includes(user.role)) {
+      ApiClient.getWorkSummary()
+        .then((s) => {
+          const map: Record<number, number> = {};
+          s.events.forEach((e) => { map[e.event_id] = e.count; });
+          setWorkByEvent(map);
+        })
+        .catch(() => {});
+    }
   }, [cityId, router]);
 
   return (
     <div className="page-pad" style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 28px 40px" }}>
-      <nav className="ds-breadcrumb" style={{ marginBottom: 20 }}>
-        <Link href="/dashboard">Início</Link>
-        <span className="sep">›</span>
-        <span className="current">{cityName || "Cidade"}</span>
-      </nav>
-
-      <h2 className="ds-title" style={{ marginBottom: 22 }}>
-        Eventos {cityName ? `— ${cityName}` : ""}
-      </h2>
+      <PageHeader title={cityName ? `Eventos — ${cityName}` : "Eventos"} backHref="/dashboard/cities" />
 
       {loading && <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>}
 
@@ -92,7 +96,26 @@ export default function EventsPage() {
                   )}
                   {(userRole === "editor" || userRole === "admin") && (
                     <Link href={`/dashboard/editor/${cityId}/${event.id}`} className="ds-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13 }}>
-                      <Ico d={IC.edit} size={14} /> Kanban de edição
+                      <Ico d={IC.edit} size={14} /> Editar fotos
+                      {workByEvent[event.id] > 0 && (
+                        <span className="ds-badge ds-badge-danger" style={{ marginLeft: 2 }}>{workByEvent[event.id]}</span>
+                      )}
+                    </Link>
+                  )}
+                  {(userRole === "curator" || userRole === "admin") && (
+                    <Link href={`/dashboard/curator/${cityId}/${event.id}`} className="ds-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+                      <Ico d={IC.review} size={14} /> Revisar fotos
+                      {workByEvent[event.id] > 0 && (
+                        <span className="ds-badge ds-badge-danger" style={{ marginLeft: 2 }}>{workByEvent[event.id]}</span>
+                      )}
+                    </Link>
+                  )}
+                  {(userRole === "publisher" || userRole === "admin") && (
+                    <Link href={`/dashboard/publisher/${cityId}/${event.id}`} className="ds-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+                      <Ico d={IC.publish} size={14} /> Publicar fotos
+                      {workByEvent[event.id] > 0 && (
+                        <span className="ds-badge ds-badge-danger" style={{ marginLeft: 2 }}>{workByEvent[event.id]}</span>
+                      )}
                     </Link>
                   )}
                 </div>

@@ -197,6 +197,23 @@ class ReviewListSchema(Schema):
     items: List[ReviewItemSchema]
 
 
+class ReviewCityCount(Schema):
+    city_id: int
+    count: int
+
+
+class ReviewEventCount(Schema):
+    event_id: int
+    count: int
+
+
+class ReviewSummarySchema(Schema):
+    total: int
+    active_events: int
+    cities: List[ReviewCityCount]
+    events: List[ReviewEventCount]
+
+
 class CuratorDecisionRequest(Schema):
     feedback: str = ""
 
@@ -205,8 +222,11 @@ class CuratorDecisionRequest(Schema):
 
 @router.get("/review", response=ReviewListSchema)
 @require_role("curator")
-def review_queue(request):
-    """Lista itens aguardando revisão do curador autenticado."""
+def review_queue(request, event_id: Optional[int] = None):
+    """Lista itens aguardando revisão do curador autenticado.
+
+    Se ``event_id`` for informado, filtra apenas as revisões daquele evento.
+    """
     curator = request.auth
 
     tasks = Task.objects.select_related(
@@ -216,6 +236,8 @@ def review_queue(request):
         role_type="curator",
         status="pending",
     )
+    if event_id:
+        tasks = tasks.filter(media_version__media__event_id=event_id)
 
     items: List[ReviewItemSchema] = []
     for task in tasks:
@@ -254,6 +276,39 @@ def review_queue(request):
         )
 
     return ReviewListSchema(items=items)
+
+
+@router.get("/review/summary", response=ReviewSummarySchema)
+@require_role("curator")
+def review_summary(request):
+    """Contagem de revisões pendentes do curador, agrupada por cidade e evento.
+
+    Alimenta os badges de notificação nas telas de Cidades/Eventos e o
+    contador da tela inicial.
+    """
+    curator = request.auth
+
+    tasks = Task.objects.select_related(
+        "media_version__media__event"
+    ).filter(
+        assigned_to=curator,
+        role_type="curator",
+        status="pending",
+    )
+
+    by_city = defaultdict(int)
+    by_event = defaultdict(int)
+    for task in tasks:
+        event = task.media_version.media.event
+        by_city[event.city_id] += 1
+        by_event[event.id] += 1
+
+    return ReviewSummarySchema(
+        total=sum(by_event.values()),
+        active_events=len(by_event),
+        cities=[ReviewCityCount(city_id=cid, count=c) for cid, c in by_city.items()],
+        events=[ReviewEventCount(event_id=eid, count=c) for eid, c in by_event.items()],
+    )
 
 
 @router.post("/{task_id}/approve")
@@ -470,8 +525,11 @@ class PublishHistorySchema(Schema):
 
 @router.get("/publish", response=PublishListSchema)
 @require_role("publisher")
-def publish_queue(request):
-    """Lista tasks pendentes do publicador autenticado."""
+def publish_queue(request, event_id: Optional[int] = None):
+    """Lista tasks pendentes do publicador autenticado.
+
+    Se ``event_id`` for informado, filtra apenas as daquele evento.
+    """
     publisher = request.auth
 
     tasks = Task.objects.select_related(
@@ -481,6 +539,8 @@ def publish_queue(request):
         role_type="publisher",
         status="pending",
     )
+    if event_id:
+        tasks = tasks.filter(media_version__media__event_id=event_id)
 
     items: List[PublishItemSchema] = []
     for task in tasks:

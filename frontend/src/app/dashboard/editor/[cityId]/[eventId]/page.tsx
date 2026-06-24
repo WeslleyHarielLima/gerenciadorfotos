@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { ApiClient } from "@/lib/api";
 import { EditorBoard, MediaItem, TaskItem, UploadEditedResultItem } from "@/lib/types";
 import PhotoDrawer from "@/components/PhotoDrawer";
@@ -211,13 +211,7 @@ export default function EditorKanbanPage() {
     <>
       <div className="page-pad" style={{ maxWidth: 1240, margin: "0 auto", padding: "28px 28px 40px" }}>
         {/* Breadcrumb */}
-        <nav className="ds-breadcrumb" style={{ marginBottom: 22 }}>
-          <Link href="/dashboard">Início</Link>
-          <span className="sep">›</span>
-          <Link href={`/dashboard/${cityId}`}>Cidade</Link>
-          <span className="sep">›</span>
-          <span className="current">Kanban do Editor</span>
-        </nav>
+        <PageHeader title="Editar fotos" backHref={`/dashboard/${cityId}`} />
 
         {loading && <p className="ds-text-muted" style={{ fontSize: 13 }}>Carregando...</p>}
         {error && <p className="ds-alert ds-alert-danger">{error}</p>}
@@ -245,7 +239,7 @@ export default function EditorKanbanPage() {
                 <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma mídia disponível.</p>
               )}
 
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2 lg:max-h-[60vh] lg:overflow-y-auto">
                 {board.available.map((m: MediaItem, i: number) => (
                   <div
                     key={m.id}
@@ -332,7 +326,7 @@ export default function EditorKanbanPage() {
                 <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhum arquivo em edição.</p>
               )}
 
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2 lg:max-h-[60vh] lg:overflow-y-auto">
                 {board.editing.map((t: TaskItem) => (
                   <div
                     key={t.task_id}
@@ -407,7 +401,7 @@ export default function EditorKanbanPage() {
                 <p className="ds-text-muted" style={{ fontSize: 13 }}>Nenhuma mídia enviada ainda.</p>
               )}
 
-              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2 lg:max-h-[60vh] lg:overflow-y-auto">
                 {board.sent.map((t: TaskItem) => (
                   <button
                     key={t.task_id}

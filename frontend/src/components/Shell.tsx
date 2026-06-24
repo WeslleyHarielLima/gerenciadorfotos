@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IC, Ico, LogoMark } from "@/components/icons";
+import BottomNav from "@/components/BottomNav";
 import type { User, UserRole } from "@/lib/types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -17,22 +18,15 @@ const ROLE_LABELS: Record<UserRole, string> = {
 type NavItem = { id: string; label: string; href: string; icon: string | string[] };
 
 function navForRole(role: UserRole): NavItem[] {
-  const items: NavItem[] = [{ id: "home", label: "Início", href: "/dashboard", icon: IC.home }];
-  if (role === "admin") {
-    items.push({ id: "admin", label: "Administração", href: "/dashboard/admin", icon: IC.admin });
-  }
-  return items;
-}
-
-/* Título da página a partir da rota — espelha a topbar do modelo */
-function titleFromPath(path: string): string {
-  if (path.startsWith("/dashboard/admin")) return "Administração";
-  if (path.startsWith("/dashboard/uploader")) return "Envio de mídia";
-  if (path.startsWith("/dashboard/editor")) return "Edição";
-  if (path.startsWith("/dashboard/curator")) return "Revisão";
-  if (path.startsWith("/dashboard/publisher")) return "Publicação";
-  if (/^\/dashboard\/\d+/.test(path)) return "Eventos";
-  return "Início";
+  const inicio: NavItem =
+    role === "admin"
+      ? { id: "home", label: "Painel", href: "/dashboard/admin", icon: IC.admin }
+      : { id: "home", label: "Início", href: "/dashboard", icon: IC.home };
+  return [
+    inicio,
+    { id: "cities", label: "Cidades", href: "/dashboard/cities", icon: IC.city },
+    { id: "perfil", label: "Perfil", href: "/dashboard/perfil", icon: IC.user },
+  ];
 }
 
 function initials(name: string): string {
@@ -89,13 +83,9 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const nav = navForRole(user.role);
   const W = expanded ? 240 : 72;
-
-  // Fecha a gaveta mobile ao trocar de rota
-  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   useEffect(() => {
     const stored = (localStorage.getItem("wf_theme") as "dark" | "light" | null) ?? "dark";
@@ -112,10 +102,9 @@ export default function DashboardShell({
 
   return (
     <div className="shell-root">
-      {/* ── SIDEBAR ─────────────────────────────────────── */}
+      {/* ── SIDEBAR (desktop) ───────────────────────────── */}
       <aside
         className="shell-sidebar"
-        data-open={mobileOpen}
         style={{ "--sidebar-w": `${W}px` } as React.CSSProperties}
       >
         {/* Marca */}
@@ -187,9 +176,6 @@ export default function DashboardShell({
         </div>
       </aside>
 
-      {/* Overlay da gaveta — só aparece no mobile quando aberta */}
-      <div className="shell-overlay" data-open={mobileOpen} onClick={() => setMobileOpen(false)} />
-
       {/* ── ÁREA PRINCIPAL ──────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Topbar */}
@@ -208,16 +194,9 @@ export default function DashboardShell({
             zIndex: 20,
           }}
         >
-          <button
-            className="shell-hamburger"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Abrir menu"
-            style={{ width: 36, height: 36, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", borderRadius: 8, marginRight: 2 }}
-          >
-            <Ico d={IC.menu} size={20} />
-          </button>
-          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{titleFromPath(pathname)}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+          <span className="shell-topbar-logo"><LogoMark size={30} /></span>
+          {/* Conta + tema: só no desktop. No mobile, tudo isso fica na aba Perfil. */}
+          <div className="shell-topbar-actions" style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button
               onClick={toggleTheme}
               title={theme === "dark" ? "Modo claro" : "Modo escuro"}
@@ -237,8 +216,11 @@ export default function DashboardShell({
         </header>
 
         {/* Conteúdo (cada página renderiza o próprio canvas) */}
-        <main style={{ flex: 1, overflowY: "auto", background: "var(--bg-canvas)" }}>{children}</main>
+        <main className="shell-main" style={{ flex: 1, overflowY: "auto", background: "var(--bg-canvas)" }}>{children}</main>
       </div>
+
+      {/* ── BARRA DE ABAS (mobile) ──────────────────────── */}
+      <BottomNav items={nav} pathname={pathname} />
     </div>
   );
 }
