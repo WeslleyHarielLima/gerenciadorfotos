@@ -36,6 +36,13 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DJANGO_SETTINGS_MODULE: config.settings
+      # B6 — service account montada em runtime; GOOGLE_OAUTH_TOKEN_FILE (vindo do
+      # .env) é zerado para forçar o caminho da SA dentro do container.
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      GOOGLE_OAUTH_TOKEN_FILE: ""
+    volumes:
+      # Nunca copiar segredos para a imagem (ficam em camadas do registry) — montar em runtime.
+      - ${GOOGLE_SA_HOST_PATH:-./docs/weighty-skyline-499813-b5-5927c09d2280.json}:/secrets/sa.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,6 +120,13 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DJANGO_SETTINGS_MODULE: config.settings
+      # B6 — service account montada em runtime; GOOGLE_OAUTH_TOKEN_FILE (vindo do
+      # .env) é zerado para forçar o caminho da SA dentro do container.
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      GOOGLE_OAUTH_TOKEN_FILE: ""
+    volumes:
+      # Nunca copiar segredos para a imagem (ficam em camadas do registry) — montar em runtime.
+      - ${GOOGLE_SA_HOST_PATH:-./docs/weighty-skyline-499813-b5-5927c09d2280.json}:/secrets/sa.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,6 +157,13 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DJANGO_SETTINGS_MODULE: config.settings
+      # B6 — service account montada em runtime; GOOGLE_OAUTH_TOKEN_FILE (vindo do
+      # .env) é zerado para forçar o caminho da SA dentro do container.
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      GOOGLE_OAUTH_TOKEN_FILE: ""
+    volumes:
+      # Nunca copiar segredos para a imagem (ficam em camadas do registry) — montar em runtime.
+      - ${GOOGLE_SA_HOST_PATH:-./docs/weighty-skyline-499813-b5-5927c09d2280.json}:/secrets/sa.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,6 +194,13 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DJANGO_SETTINGS_MODULE: config.settings
+      # B6 — service account montada em runtime; GOOGLE_OAUTH_TOKEN_FILE (vindo do
+      # .env) é zerado para forçar o caminho da SA dentro do container.
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      GOOGLE_OAUTH_TOKEN_FILE: ""
+    volumes:
+      # Nunca copiar segredos para a imagem (ficam em camadas do registry) — montar em runtime.
+      - ${GOOGLE_SA_HOST_PATH:-./docs/weighty-skyline-499813-b5-5927c09d2280.json}:/secrets/sa.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -204,6 +232,13 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DJANGO_SETTINGS_MODULE: config.settings
+      # B6 — service account montada em runtime; GOOGLE_OAUTH_TOKEN_FILE (vindo do
+      # .env) é zerado para forçar o caminho da SA dentro do container.
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      GOOGLE_OAUTH_TOKEN_FILE: ""
+    volumes:
+      # Nunca copiar segredos para a imagem (ficam em camadas do registry) — montar em runtime.
+      - ${GOOGLE_SA_HOST_PATH:-./docs/weighty-skyline-499813-b5-5927c09d2280.json}:/secrets/sa.json:ro
     depends_on:
       postgres:
         condition: service_healthy
