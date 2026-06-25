@@ -63,6 +63,8 @@ source .venv/bin/activate
 
 export DJANGO_SETTINGS_MODULE=config.settings
 export DB_PORT=5433
+# Desenvolvimento: liga DEBUG (sem ele os fail-safes de produção B3/Q7 abortam o boot).
+export DEBUG=true
 
 # Aplica migrações pendentes silenciosamente
 python manage.py migrate --run-syncdb 2>&1 | grep -v "^$" | sed 's/^/  /' || true
@@ -123,6 +125,7 @@ cd "$BACKEND"
   source .venv/bin/activate
   export DJANGO_SETTINGS_MODULE=config.settings
   export DB_PORT=5433
+  export DEBUG=true
   while true; do
     python scripts/calendar_sync.py >> /tmp/calendar_sync_dev.log 2>&1
     sleep 60

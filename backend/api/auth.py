@@ -11,7 +11,14 @@ from shared.secrets import get_jwt_secret
 
 
 def _get_secret() -> str:
-    return get_jwt_secret() or os.environ.get("DJANGO_SECRET_KEY", "insecure")
+    # B3 — sem fallback "insecure": JWT é assinado com este segredo. Se o GSM e a
+    # env vierem vazios, deixar estourar (500 explícito é melhor que segredo previsível).
+    secret = get_jwt_secret() or os.environ.get("DJANGO_SECRET_KEY", "")
+    if not secret:
+        raise RuntimeError(
+            "Segredo JWT indisponível: defina DJANGO_SECRET_KEY ou configure o GSM."
+        )
+    return secret
 
 
 def _algorithm() -> str:
