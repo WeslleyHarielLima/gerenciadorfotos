@@ -3,8 +3,11 @@ import os
 import zipfile
 from typing import List
 
+from django.db import transaction
+from django.db.models import Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from ninja import File, Form, Router, Schema
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
@@ -40,6 +43,20 @@ ALLOWED_MIME_TYPES = {
     "video/x-msvideo",
     "video/x-matroska",
 }
+
+# I5 — tetos para conter uso de memória (upload/zip são montados em RAM).
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+# Teto por arquivo no upload (bem abaixo do client_max_body_size 500M do nginx).
+MAX_UPLOAD_BYTES = _env_int("MAX_UPLOAD_BYTES", 100 * 1024 * 1024)  # 100 MB
+# Máximo de itens por lote de download (cada original é lido inteiro do Drive).
+MAX_DOWNLOAD_BATCH = _env_int("MAX_DOWNLOAD_BATCH", 50)
+# Teto do tamanho total acumulado do zip em memória.
+MAX_DOWNLOAD_TOTAL_BYTES = _env_int("MAX_DOWNLOAD_TOTAL_BYTES", 500 * 1024 * 1024)  # 500 MB
 
 
 class UploadResultItem(Schema):
@@ -102,6 +119,15 @@ def upload_media(
             continue
 
         data = f.read()
+
+        # I5 — rejeita arquivos acima do teto antes de subir ao Drive.
+        if len(data) > MAX_UPLOAD_BYTES:
+            results.append(
+                UploadResultItem(filename=f.name, success=False,
+                                 error=f"Arquivo excede o tamanho máximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
+            )
+            continue
+
         sha256 = calculate_sha256(data)
 
         try:
@@ -219,12 +245,13 @@ def delete_media(request, media_id: int):
     filename = media.original_filename
     event_id = media.event_id
 
-    # Cloudinary: remove thumbnails (best-effort — não bloqueia).
+    # Coleta os public_ids do Cloudinary ANTES de apagar as versões.
+    cloudinary_public_ids = []
     if media.cloudinary_public_id:
-        delete_asset(media.cloudinary_public_id)
+        cloudinary_public_ids.append(media.cloudinary_public_id)
     for v in media.versions.all():
         if v.cloudinary_public_id:
-            delete_asset(v.cloudinary_public_id)
+            cloudinary_public_ids.append(v.cloudinary_public_id)
 
     with transaction.atomic():
         # Drive: enfileira deleção offline de cada arquivo das versões.
@@ -245,6 +272,14 @@ def delete_media(request, media_id: int):
         media.versions.all().delete()
         media.delete()
 
+        # I2 — só remove thumbnails no Cloudinary se o commit do banco suceder
+        # (evita apagar o asset e depois o banco fazer rollback, deixando órfão).
+        def _cleanup_cloudinary(ids=cloudinary_public_ids):
+            for pid in ids:
+                delete_asset(pid)
+
+        transaction.on_commit(_cleanup_cloudinary)
+
     return {"detail": "Mídia removida."}
 
 
@@ -258,11 +293,20 @@ def download_batch(request, payload: DownloadBatchRequest):
     if not payload.media_ids:
         raise HttpError(400, "Informe ao menos um media_id.")
 
+    # I5 — limita itens por lote (cada original é lido inteiro do Drive para a RAM).
+    media_ids = list(dict.fromkeys(payload.media_ids))  # dedup preservando ordem
+    if len(media_ids) > MAX_DOWNLOAD_BATCH:
+        raise HttpError(400, f"Lote excede o máximo de {MAX_DOWNLOAD_BATCH} itens.")
+
     editor = request.auth
     buf = io.BytesIO()
+    prepared = []  # (media_id, original_version_id, perceptual_hash)
+    total_bytes = 0
 
+    # I1 — 1ª passada: valida tudo e monta o zip (leituras read-only no Drive),
+    # SEM mutar estado de banco. Se qualquer item falhar, nada foi commitado.
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for media_id in payload.media_ids:
+        for media_id in media_ids:
             media = get_object_or_404(Media, id=media_id)
 
             if media.status != "uploaded":
@@ -280,21 +324,41 @@ def download_batch(request, payload: DownloadBatchRequest):
             except Exception as exc:
                 raise HttpError(502, f"Falha ao baixar mídia #{media_id} do Drive: {exc}")
 
+            # I5 — corta antes de estourar a memória do worker.
+            total_bytes += len(data)
+            if total_bytes > MAX_DOWNLOAD_TOTAL_BYTES:
+                raise HttpError(413, "Tamanho total do lote excede o limite. Baixe em partes menores.")
+
             data = inject_media_id_exif(data, media.id, media.mime_type)
 
-            from api.services.watermark import embed_watermark
-            data = embed_watermark(data, media.id, media.mime_type)
-
+            # I8 — watermark removido: extract_watermark nunca era chamado em produção
+            # (a identificação no upload-edited usa EXIF → nome → hash perceptual) e o
+            # bit não sobrevivia ao JPEG. Re-encode full-res era custo de CPU sem retorno.
             from api.services.perceptual import compute as phash_compute, to_hex as phash_to_hex
             perceptual_hash = phash_to_hex(phash_compute(data))
 
             zf.writestr(media.original_filename, data)
+            prepared.append((media.id, original_version.id, perceptual_hash))
 
+    # I6 — 2ª passada: muta tudo atomicamente, com lock por linha. Revalida o status
+    # sob o lock para que dois editores não puxem a mesma mídia simultaneamente.
+    with transaction.atomic():
+        locked = {
+            m.id: m
+            for m in Media.objects.select_for_update().filter(
+                id__in=[mid for mid, _, _ in prepared]
+            )
+        }
+        for media_id, _, _ in prepared:
+            if locked.get(media_id) and locked[media_id].status != "uploaded":
+                raise HttpError(409, f"Mídia #{media_id} já foi puxada por outro editor.")
+
+        for media_id, original_version_id, perceptual_hash in prepared:
+            media = locked[media_id]
             media.status = "selected_for_edit"
             media.save(update_fields=["status", "last_status_change"])
-
             Task.objects.create(
-                media_version=original_version,
+                media_version_id=original_version_id,
                 assigned_to=editor,
                 role_type="editor",
                 status="in_progress",
@@ -343,6 +407,14 @@ def upload_edited(
 
     for f in files:
         data = f.read()
+
+        # I5 — rejeita arquivos acima do teto antes de qualquer processamento.
+        if len(data) > MAX_UPLOAD_BYTES:
+            results.append(
+                UploadEditedResultItem(filename=f.name, success=False,
+                                       error=f"Arquivo excede o tamanho máximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
+            )
+            continue
 
         from api.services.exif import extract_media_id_exif
         media_id = extract_media_id_exif(data)
@@ -462,20 +534,39 @@ def upload_edited(
             )
             continue
 
-        # Próximo número de versão
-        next_version = media.versions.count() + 1
+        # I2/I6/I7 — escritas de banco atômicas, com a mídia travada (select_for_update)
+        # e o número da versão calculado por Max() sob o lock. Evita versões duplicadas
+        # em uploads editados concorrentes e estado divergente em falha no meio do fluxo.
+        with transaction.atomic():
+            Media.objects.select_for_update().get(id=media.id)
+            next_version = (media.versions.aggregate(m=Max("version"))["m"] or 0) + 1
 
-        media_version = MediaVersion.objects.create(
-            media=media,
-            version=next_version,
-            drive_file_id=drive_result["file_id"],
-            hash_sha256=new_hash,
-            edited_by=editor,
-            status="edited",
-            file_size=len(data),
-        )
+            media_version = MediaVersion.objects.create(
+                media=media,
+                version=next_version,
+                drive_file_id=drive_result["file_id"],
+                hash_sha256=new_hash,
+                edited_by=editor,
+                status="edited",
+                file_size=len(data),
+            )
 
-        # Upload da versão editada ao Cloudinary para comparação no painel do curador
+            media.status = "pending_review"
+            media.save(update_fields=["status", "last_status_change"])
+
+            # Completa task do editor
+            task.status = "completed"
+            task.save(update_fields=["status", "updated_at"])
+
+            # Cria task para o curador
+            Task.objects.create(
+                media_version=media_version,
+                assigned_to=_get_any_curator(),
+                role_type="curator",
+                status="pending",
+            )
+
+        # Cloudinary é efeito externo best-effort — fica FORA da transação (após o commit).
         cloudinary_result = upload_version_thumbnail(data, media.id, next_version, f.content_type)
         if cloudinary_result:
             media_version.cloudinary_url = cloudinary_result["url"]
@@ -484,21 +575,6 @@ def upload_edited(
         elif f.content_type in IMAGE_MIME_TYPES:
             from core.models import PendingCloudinaryUpload
             PendingCloudinaryUpload.objects.create(media_version=media_version)
-
-        media.status = "pending_review"
-        media.save(update_fields=["status", "last_status_change"])
-
-        # Completa task do editor
-        task.status = "completed"
-        task.save(update_fields=["status", "updated_at"])
-
-        # Cria task para o curador
-        Task.objects.create(
-            media_version=media_version,
-            assigned_to=_get_any_curator(),
-            role_type="curator",
-            status="pending",
-        )
 
         results.append(
             UploadEditedResultItem(filename=f.name, success=True, media_version_id=media_version.id)
@@ -539,14 +615,32 @@ class MediaDetailSchema(Schema):
     versions: List[MediaVersionDetail]
 
 
+def _user_can_access_media(user, media: Media) -> bool:
+    """I4 — vínculo do usuário com a mídia/evento.
+
+    Acesso permitido a: admin; quem enviou a mídia; curador/publicador (operam o
+    fluxo de revisão/publicação do evento); ou qualquer usuário com uma task
+    (ativa ou concluída) em alguma versão desta mídia.
+    """
+    if not user:
+        return False
+    if user.role in ("admin", "curator", "publisher"):
+        return True
+    if media.uploaded_by_id == user.id:
+        return True
+    return Task.objects.filter(media_version__media=media, assigned_to=user).exists()
+
+
 @router.get("/{int:media_id}/detail", response=MediaDetailSchema)
 def media_detail(request, media_id: int):
     """Retorna metadados completos e histórico de versões de uma mídia."""
     if not request.auth:
         raise HttpError(401, "Não autenticado.")
 
-    from django.shortcuts import get_object_or_404
     media = get_object_or_404(Media, id=media_id)
+
+    if not _user_can_access_media(request.auth, media):
+        raise HttpError(404, "Mídia não encontrada.")
 
     versions = [
         MediaVersionDetail(
@@ -575,25 +669,35 @@ def media_detail(request, media_id: int):
     )
 
 
-@router.get("/proxy/{drive_file_id}")
-def proxy_media(request, drive_file_id: str):
-    """Proxy autenticado para visualização de mídia do Drive."""
-    if not request.auth:
-        raise HttpError(401, "Não autenticado.")
+@router.get("/proxy/{int:media_id}/{int:version}")
+@require_role("editor", "curator", "publisher", "admin")
+def proxy_media(request, media_id: int, version: int):
+    """Proxy autenticado para visualização de uma versão de mídia do Drive.
+
+    I4 — recebe ``media_id``/``version`` e resolve o ``drive_file_id`` internamente
+    (em vez de aceitar o id cru do Drive vindo do cliente), impedindo enumeração de
+    arquivos do Drive. Restrito a papéis que participam do fluxo de revisão.
+    """
+    media_version = get_object_or_404(MediaVersion, media_id=media_id, version=version)
 
     try:
-        data = get_file_bytes(drive_file_id)
+        data = get_file_bytes(media_version.drive_file_id)
     except Exception as exc:
         raise HttpError(502, f"Falha ao obter arquivo do Drive: {exc}")
 
-    # Detectar mime_type a partir do cabeçalho dos bytes
-    import imghdr
-    img_type = imghdr.what(None, h=data[:512])
-    if img_type:
-        content_type = f"image/{img_type}"
-    else:
-        content_type = "application/octet-stream"
+    # I3 — detectar o tipo via Pillow (imghdr foi removido no Python 3.13).
+    content_type = _detect_image_content_type(data)
 
     response = HttpResponse(data, content_type=content_type)
     response["Cache-Control"] = "private, max-age=900"
     return response
+
+
+def _detect_image_content_type(data: bytes) -> str:
+    """Detecta o Content-Type da imagem por magic bytes (via Pillow)."""
+    from PIL import Image
+    try:
+        kind = Image.open(io.BytesIO(data)).format  # "JPEG", "PNG", "WEBP"...
+        return f"image/{kind.lower()}" if kind else "application/octet-stream"
+    except Exception:
+        return "application/octet-stream"

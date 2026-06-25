@@ -149,9 +149,13 @@ def get_subfolder_id(parent_id: str, name: str) -> Optional[str]:
     """Localiza subfolder por nome. Retorna None se não encontrar."""
     def _do():
         service = get_drive_service()
+        # Q2 — escapar barra invertida e aspas simples antes de interpolar na query
+        # (nomes de evento podem conter ', o que quebraria/permitiria manipular a query).
+        safe_name = name.replace("\\", "\\\\").replace("'", "\\'")
+        safe_parent = parent_id.replace("\\", "\\\\").replace("'", "\\'")
         q = (
-            f"'{parent_id}' in parents"
-            f" and name='{name}'"
+            f"'{safe_parent}' in parents"
+            f" and name='{safe_name}'"
             " and mimeType='application/vnd.google-apps.folder'"
             " and trashed=false"
         )

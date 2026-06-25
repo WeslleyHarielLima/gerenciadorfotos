@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import List, Optional
 
+from django.db import transaction
 from django.utils import timezone
 from ninja import Router, Schema
 from ninja.errors import HttpError
@@ -135,16 +136,7 @@ VALID_REASON_TYPES = {choice[0] for choice in Task.DELETION_REASON_CHOICES}
 def abandon_task(request, task_id: int, payload: AbandonRequest):
     editor = request.auth
 
-    task = Task.objects.select_related("media_version__media").filter(
-        id=task_id, assigned_to=editor, role_type="editor"
-    ).first()
-
-    if not task:
-        raise HttpError(404, "Tarefa não encontrada ou não pertence a você.")
-
-    if task.status != "in_progress":
-        raise HttpError(400, f"Tarefa não está em andamento (status atual: {task.status}).")
-
+    # Validações de payload antes de abrir transação (não tocam o banco).
     if payload.reason_type not in VALID_REASON_TYPES:
         raise HttpError(
             400,
@@ -154,19 +146,30 @@ def abandon_task(request, task_id: int, payload: AbandonRequest):
     if payload.reason_type == "other" and not payload.reason_custom.strip():
         raise HttpError(400, "Descrição obrigatória quando o motivo é 'outro'.")
 
-    task.status = "abandoned"
-    task.deletion_reason_type = payload.reason_type
-    task.deletion_reason_custom = payload.reason_custom.strip()
-    task.deleted_at = timezone.now()
-    task.deleted_by = editor
-    task.save(update_fields=[
-        "status", "deletion_reason_type", "deletion_reason_custom",
-        "deleted_at", "deleted_by", "updated_at",
-    ])
+    with transaction.atomic():
+        task = Task.objects.select_for_update().select_related("media_version__media").filter(
+            id=task_id, assigned_to=editor, role_type="editor"
+        ).first()
 
-    media = task.media_version.media
-    media.status = "uploaded"
-    media.save(update_fields=["status", "last_status_change"])
+        if not task:
+            raise HttpError(404, "Tarefa não encontrada ou não pertence a você.")
+
+        if task.status != "in_progress":
+            raise HttpError(400, f"Tarefa não está em andamento (status atual: {task.status}).")
+
+        task.status = "abandoned"
+        task.deletion_reason_type = payload.reason_type
+        task.deletion_reason_custom = payload.reason_custom.strip()
+        task.deleted_at = timezone.now()
+        task.deleted_by = editor
+        task.save(update_fields=[
+            "status", "deletion_reason_type", "deletion_reason_custom",
+            "deleted_at", "deleted_by", "updated_at",
+        ])
+
+        media = task.media_version.media
+        media.status = "uploaded"
+        media.save(update_fields=["status", "last_status_change"])
 
     return {"detail": "Tarefa abandonada. Arquivo devolvido ao pool."}
 
@@ -246,9 +249,9 @@ def review_queue(request, event_id: Optional[int] = None):
 
         original_version = media.versions.filter(status="original").order_by("version").first()
         original_proxy = (
-            f"/api/media/proxy/{original_version.drive_file_id}" if original_version else ""
+            f"/api/media/proxy/{media.id}/{original_version.version}" if original_version else ""
         )
-        edited_proxy = f"/api/media/proxy/{edited_version.drive_file_id}"
+        edited_proxy = f"/api/media/proxy/{media.id}/{edited_version.version}"
 
         history = [
             VersionHistoryItem(
@@ -317,55 +320,58 @@ def approve_task(request, task_id: int):
     """Aprova versão editada. Registra versões intermediárias para deleção e cria task do publicador."""
     curator = request.auth
 
-    task = Task.objects.select_related("media_version__media").filter(
-        id=task_id, assigned_to=curator, role_type="curator", status="pending"
-    ).first()
+    # I2/I6 — claim atômico da task com lock por linha. Dois curadores na mesma
+    # revisão: exatamente um passa; o outro vê a task já não-pending (404).
+    with transaction.atomic():
+        task = Task.objects.select_for_update().select_related("media_version__media").filter(
+            id=task_id, assigned_to=curator, role_type="curator", status="pending"
+        ).first()
 
-    if not task:
-        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+        if not task:
+            raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
 
-    edited_version = task.media_version
-    media = edited_version.media
+        edited_version = task.media_version
+        media = edited_version.media
 
-    # Marcar versão editada como aprovada
-    edited_version.status = "approved"
-    edited_version.save(update_fields=["status"])
+        # Marcar versão editada como aprovada
+        edited_version.status = "approved"
+        edited_version.save(update_fields=["status"])
 
-    media.status = "approved"
-    media.save(update_fields=["status", "last_status_change"])
+        media.status = "approved"
+        media.save(update_fields=["status", "last_status_change"])
 
-    # Registrar versões intermediárias (edited que não é a aprovada) para deleção
-    intermediate_versions = media.versions.filter(status="edited").exclude(id=edited_version.id)
-    for v in intermediate_versions:
-        PendingDriveDeletion.objects.create(
-            drive_file_id=v.drive_file_id,
-            media_version=v,
+        # Registrar versões intermediárias (edited que não é a aprovada) para deleção
+        intermediate_versions = media.versions.filter(status="edited").exclude(id=edited_version.id)
+        for v in intermediate_versions:
+            PendingDriveDeletion.objects.create(
+                drive_file_id=v.drive_file_id,
+                media_version=v,
+            )
+
+        # Concluir task do curador
+        task.status = "completed"
+        task.save(update_fields=["status", "updated_at"])
+
+        # Histórico
+        TaskHistory.objects.create(
+            media=media,
+            media_version=edited_version,
+            reviewed_by=curator,
+            decision="approved",
         )
 
-    # Concluir task do curador
-    task.status = "completed"
-    task.save(update_fields=["status", "updated_at"])
+        # Criar task do publicador
+        from core.models import User
+        publisher = User.objects.filter(role="publisher", is_active=True).first()
+        if not publisher:
+            raise HttpError(500, "Nenhum publicador ativo encontrado no sistema.")
 
-    # Histórico
-    TaskHistory.objects.create(
-        media=media,
-        media_version=edited_version,
-        reviewed_by=curator,
-        decision="approved",
-    )
-
-    # Criar task do publicador
-    from core.models import User
-    publisher = User.objects.filter(role="publisher", is_active=True).first()
-    if not publisher:
-        raise HttpError(500, "Nenhum publicador ativo encontrado no sistema.")
-
-    Task.objects.create(
-        media_version=edited_version,
-        assigned_to=publisher,
-        role_type="publisher",
-        status="pending",
-    )
+        Task.objects.create(
+            media_version=edited_version,
+            assigned_to=publisher,
+            role_type="publisher",
+            status="pending",
+        )
 
     return {"detail": "Mídia aprovada. Task do publicador criada."}
 
@@ -379,57 +385,58 @@ def reject_with_return(request, task_id: int, payload: CuratorDecisionRequest):
 
     curator = request.auth
 
-    task = Task.objects.select_related("media_version__media").filter(
-        id=task_id, assigned_to=curator, role_type="curator", status="pending"
-    ).first()
+    with transaction.atomic():
+        task = Task.objects.select_for_update().select_related("media_version__media").filter(
+            id=task_id, assigned_to=curator, role_type="curator", status="pending"
+        ).first()
 
-    if not task:
-        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+        if not task:
+            raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
 
-    edited_version = task.media_version
-    media = edited_version.media
+        edited_version = task.media_version
+        media = edited_version.media
 
-    # Marcar versão editada como rejeitada
-    edited_version.status = "rejected"
-    edited_version.save(update_fields=["status"])
+        # Marcar versão editada como rejeitada
+        edited_version.status = "rejected"
+        edited_version.save(update_fields=["status"])
 
-    # Voltar status da mídia
-    media.status = "selected_for_edit"
-    media.save(update_fields=["status", "last_status_change"])
+        # Voltar status da mídia
+        media.status = "selected_for_edit"
+        media.save(update_fields=["status", "last_status_change"])
 
-    # Concluir task do curador
-    task.status = "completed"
-    task.feedback = payload.feedback.strip()
-    task.save(update_fields=["status", "feedback", "updated_at"])
+        # Concluir task do curador
+        task.status = "completed"
+        task.feedback = payload.feedback.strip()
+        task.save(update_fields=["status", "feedback", "updated_at"])
 
-    # Histórico
-    TaskHistory.objects.create(
-        media=media,
-        media_version=edited_version,
-        reviewed_by=curator,
-        decision="rejected_with_return",
-        feedback=payload.feedback.strip(),
-    )
+        # Histórico
+        TaskHistory.objects.create(
+            media=media,
+            media_version=edited_version,
+            reviewed_by=curator,
+            decision="rejected_with_return",
+            feedback=payload.feedback.strip(),
+        )
 
-    # Criar nova task do editor (cadeia pai/filho): a task rejeitada vira parent,
-    # permitindo rastrear original → rejeição V1 → nova tentativa V2 → aprovação.
-    original_version = media.versions.filter(status="original").first()
-    if original_version:
-        previous_editor_task = Task.objects.filter(
-            media_version=original_version,
-            role_type="editor",
-            status="completed",
-        ).order_by("-updated_at").first()
-
-        if previous_editor_task:
-            Task.objects.create(
+        # Criar nova task do editor (cadeia pai/filho): a task rejeitada vira parent,
+        # permitindo rastrear original → rejeição V1 → nova tentativa V2 → aprovação.
+        original_version = media.versions.filter(status="original").first()
+        if original_version:
+            previous_editor_task = Task.objects.filter(
                 media_version=original_version,
-                assigned_to=previous_editor_task.assigned_to,
                 role_type="editor",
-                status="in_progress",
-                feedback=payload.feedback.strip(),
-                parent_task=previous_editor_task,
-            )
+                status="completed",
+            ).order_by("-updated_at").first()
+
+            if previous_editor_task:
+                Task.objects.create(
+                    media_version=original_version,
+                    assigned_to=previous_editor_task.assigned_to,
+                    role_type="editor",
+                    status="in_progress",
+                    feedback=payload.feedback.strip(),
+                    parent_task=previous_editor_task,
+                )
 
     return {"detail": "Mídia devolvida ao editor para correção."}
 
@@ -443,41 +450,42 @@ def reject_final(request, task_id: int, payload: CuratorDecisionRequest):
 
     curator = request.auth
 
-    task = Task.objects.select_related("media_version__media").filter(
-        id=task_id, assigned_to=curator, role_type="curator", status="pending"
-    ).first()
+    with transaction.atomic():
+        task = Task.objects.select_for_update().select_related("media_version__media").filter(
+            id=task_id, assigned_to=curator, role_type="curator", status="pending"
+        ).first()
 
-    if not task:
-        raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
+        if not task:
+            raise HttpError(404, "Tarefa de revisão não encontrada ou não pertence a você.")
 
-    edited_version = task.media_version
-    media = edited_version.media
+        edited_version = task.media_version
+        media = edited_version.media
 
-    media.status = "rejected_final"
-    media.save(update_fields=["status", "last_status_change"])
+        media.status = "rejected_final"
+        media.save(update_fields=["status", "last_status_change"])
 
-    # Registrar todas as versões editadas para deleção
-    for v in media.versions.filter(status="edited"):
-        PendingDriveDeletion.objects.create(
-            drive_file_id=v.drive_file_id,
-            media_version=v,
+        # Registrar todas as versões editadas para deleção
+        for v in media.versions.filter(status="edited"):
+            PendingDriveDeletion.objects.create(
+                drive_file_id=v.drive_file_id,
+                media_version=v,
+            )
+            v.status = "rejected"
+            v.save(update_fields=["status"])
+
+        # Concluir task do curador
+        task.status = "completed"
+        task.feedback = payload.feedback.strip()
+        task.save(update_fields=["status", "feedback", "updated_at"])
+
+        # Histórico
+        TaskHistory.objects.create(
+            media=media,
+            media_version=edited_version,
+            reviewed_by=curator,
+            decision="rejected_final",
+            feedback=payload.feedback.strip(),
         )
-        v.status = "rejected"
-        v.save(update_fields=["status"])
-
-    # Concluir task do curador
-    task.status = "completed"
-    task.feedback = payload.feedback.strip()
-    task.save(update_fields=["status", "feedback", "updated_at"])
-
-    # Histórico
-    TaskHistory.objects.create(
-        media=media,
-        media_version=edited_version,
-        reviewed_by=curator,
-        decision="rejected_final",
-        feedback=payload.feedback.strip(),
-    )
 
     return {"detail": "Mídia rejeitada definitivamente. Versões editadas agendadas para deleção."}
 
@@ -551,7 +559,7 @@ def publish_queue(request, event_id: Optional[int] = None):
 
         original_version = media.versions.filter(status="original").order_by("version").first()
         original_proxy = (
-            f"/api/media/proxy/{original_version.drive_file_id}" if original_version else ""
+            f"/api/media/proxy/{media.id}/{original_version.version}" if original_version else ""
         )
 
         items.append(PublishItemSchema(
@@ -561,7 +569,7 @@ def publish_queue(request, event_id: Optional[int] = None):
             mime_type=media.mime_type,
             # Mostra a versão editada/aprovada (a que será publicada), não a original.
             cloudinary_url=version.cloudinary_url or media.cloudinary_url or None,
-            proxy_url=f"/api/media/proxy/{version.drive_file_id}",
+            proxy_url=f"/api/media/proxy/{media.id}/{version.version}",
             original_proxy_url=original_proxy,
             event_name=event.name,
             city_name=str(city),
@@ -580,34 +588,37 @@ def publish_task(request, task_id: int):
 
     publisher = request.auth
 
-    task = Task.objects.select_related("media_version__media__event").filter(
-        id=task_id, assigned_to=publisher, role_type="publisher", status="pending"
-    ).first()
+    # I2/I6 — claim atômico com lock. O move no Drive (efeito externo) fica ANTES
+    # dos saves e DENTRO da transação: se ele falhar, nada de banco foi tocado.
+    with transaction.atomic():
+        task = Task.objects.select_for_update().select_related("media_version__media__event").filter(
+            id=task_id, assigned_to=publisher, role_type="publisher", status="pending"
+        ).first()
 
-    if not task:
-        raise HttpError(404, "Tarefa de publicação não encontrada ou não pertence a você.")
+        if not task:
+            raise HttpError(404, "Tarefa de publicação não encontrada ou não pertence a você.")
 
-    version = task.media_version
-    media = version.media
-    event = media.event
+        version = task.media_version
+        media = version.media
+        event = media.event
 
-    if not event.google_drive_folder_id:
-        raise HttpError(500, "Evento sem pasta no Drive configurada.")
+        if not event.google_drive_folder_id:
+            raise HttpError(500, "Evento sem pasta no Drive configurada.")
 
-    published_folder_id = get_subfolder_id(event.google_drive_folder_id, "05_published")
-    if not published_folder_id:
-        published_folder_id = create_folder("05_published", event.google_drive_folder_id)
+        published_folder_id = get_subfolder_id(event.google_drive_folder_id, "05_published")
+        if not published_folder_id:
+            published_folder_id = create_folder("05_published", event.google_drive_folder_id)
 
-    try:
-        move_file(version.drive_file_id, published_folder_id)
-    except Exception as exc:
-        raise HttpError(502, f"Falha ao mover arquivo no Drive: {exc}")
+        try:
+            move_file(version.drive_file_id, published_folder_id)
+        except Exception as exc:
+            raise HttpError(502, f"Falha ao mover arquivo no Drive: {exc}")
 
-    media.status = "published"
-    media.save(update_fields=["status", "last_status_change"])
+        media.status = "published"
+        media.save(update_fields=["status", "last_status_change"])
 
-    task.status = "completed"
-    task.save(update_fields=["status", "updated_at"])
+        task.status = "completed"
+        task.save(update_fields=["status", "updated_at"])
 
     return {"detail": "Mídia publicada com sucesso."}
 

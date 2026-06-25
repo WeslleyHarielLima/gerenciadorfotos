@@ -39,10 +39,23 @@ def _configure():
     if _CONFIGURED:
         return
     import cloudinary
+    from shared.secrets import get_secret
+
+    # Q6 — credenciais sensíveis (api_key/api_secret permitem deletar/alterar todos os
+    # assets) vêm do Google Secret Manager, com fallback ao env. Só o cloud_name fica
+    # exclusivamente em variável de ambiente.
+    api_key = get_secret(
+        os.environ.get("CLOUDINARY_API_KEY_SECRET_NAME", "cloudinary-api-key"),
+        "CLOUDINARY_API_KEY",
+    )
+    api_secret = get_secret(
+        os.environ.get("CLOUDINARY_API_SECRET_SECRET_NAME", "cloudinary-api-secret"),
+        "CLOUDINARY_API_SECRET",
+    )
     cloudinary.config(
         cloud_name=os.environ["CLOUDINARY_CLOUD_NAME"],
-        api_key=os.environ["CLOUDINARY_API_KEY"],
-        api_secret=os.environ["CLOUDINARY_API_SECRET"],
+        api_key=api_key,
+        api_secret=api_secret,
         secure=True,
     )
     _CONFIGURED = True
