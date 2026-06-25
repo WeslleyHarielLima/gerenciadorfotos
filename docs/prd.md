@@ -47,7 +47,8 @@ Times de produção fotográfica e audiovisual perdem tempo e cometem erros por 
 | Backend | Django (Python) + Django Ninja, servido por uvicorn (ASGI) | Admin, ORM, migrations, auth, API REST (upload, fluxo, hash, Drive) |
 | Painel Admin | django-unfold | Tema moderno sobre o Django Admin |
 | Banco | PostgreSQL em container Docker (porta 5432) | Metadados, hashes, controle de fluxo |
-| Storage | Google Drive via API | Armazenamento de binários |
+| Storage | Google Drive via API | Armazenamento dos binários originais e versões |
+| Thumbnails | Cloudinary | Geração e entrega de miniaturas para dashboard e kanban |
 | Eventos | Google Calendar via API | Fonte dos eventos e metadados |
 | Segredos | Google Secret Manager (GSM) | Senha do Postgres e secrets sensíveis |
 | Proxy | Nginx (VPS) | Roteamento para o backend Django |
